@@ -23,6 +23,24 @@ python -m img2prompt.cli path/to/image.jpg
 ```
 
 The command writes `path/to/image.jpg.prompt.json` containing the prompt data.
+For example:
+
+```bash
+$ python -m img2prompt.cli examples/sample.jpg
+examples/sample.jpg.prompt.json
+```
+
+The generated file resembles:
+
+```json
+{
+  "caption": "a detailed caption from Florence-2",
+  "prompt": "person, hair, outdoor, close up, soft lighting, ...",
+  "negative_prompt": "low quality, worst quality, blurry, jpeg artifacts, watermark, text, extra fingers, deformed hands, bad anatomy",
+  "style": "anime",
+  "model_suggestion": ""
+}
+```
 
 ## 使い方
 
