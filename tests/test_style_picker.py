@@ -9,17 +9,15 @@ from img2prompt.assemble import style
 
 
 def test_determine_style_photo_params():
-    dd_tags = {f"tag{i}": 1.0 for i in range(40)}
-    ci_tags = {"35mm": 1.0}
-    result, params = style.determine_style(dd_tags, ci_tags)
+    ci_text = "a photo with bokeh and 35mm film grain"
+    result, params = style.determine_style(ci_text)
     assert result == "photo"
     assert params == style.PHOTO_PARAMS
 
 
 def test_determine_style_anime_params():
-    dd_tags = {f"tag{i}": 1.0 for i in range(40)}
-    ci_tags = {}
-    result, params = style.determine_style(dd_tags, ci_tags)
+    ci_text = "an illustration of a cat"
+    result, params = style.determine_style(ci_text)
     assert result == "anime"
     assert params == style.ANIME_PARAMS
 

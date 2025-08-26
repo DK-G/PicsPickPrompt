@@ -27,7 +27,7 @@ def _load() -> None:
         )
         _model.eval()
     except Exception as exc:  # pragma: no cover - fallback path
-        logger.warning("Failed to load BLIP model: %s", exc)
+        logger.warning("Failed to load BLIP model: %s", exc, exc_info=True)
         _processor = None
         _model = None
 
@@ -53,5 +53,5 @@ def generate_caption(path: Path) -> str:
         caption = _processor.decode(out[0], skip_special_tokens=True).strip()
         return caption or "an image"
     except Exception as exc:  # pragma: no cover - fallback path
-        logger.warning("Caption generation failed: %s", exc)
+        logger.warning("Caption generation failed: %s", exc, exc_info=True)
         return "an image"

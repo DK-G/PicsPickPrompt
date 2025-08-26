@@ -21,10 +21,11 @@ ANIME_PARAMS = {
 }
 
 
-def determine_style(dd_tags: Dict[str, float], ci_tags: Dict[str, float]) -> Tuple[str, Dict[str, float]]:
-    """Classify style as 'anime' or 'photo' and return suggested params."""
+def determine_style(ci_text: str) -> Tuple[str, Dict[str, float]]:
+    """Classify style as 'anime' or 'photo' from CLIP Interrogator text."""
 
-    # Simple heuristic: presence of photographic cues or low DD tag count
-    if "35mm" in ci_tags or "film grain" in ci_tags or len(dd_tags) < 30:
+    cues = ["35mm", "film grain", "bokeh", "studio light", "natural light", "cinematic"]
+    text = ci_text.lower()
+    if any(c in text for c in cues):
         return "photo", PHOTO_PARAMS.copy()
     return "anime", ANIME_PARAMS.copy()

@@ -27,14 +27,20 @@ def remove_placeholders(tags: Dict[str, float]) -> Dict[str, float]:
     }
 
 
-def merge_tags(dd: Dict[str, float], ci: Dict[str, float]) -> Dict[str, float]:
-    """Merge DeepDanbooru and CLIP Interrogator tags with weighting."""
+def merge_tags(
+    wd: Dict[str, float], dd: Dict[str, float], ci: Dict[str, float]
+) -> Dict[str, float]:
+    """Merge tag sources with weighting."""
 
     combined: Dict[str, float] = defaultdict(float)
-    for tag, score in dd.items():
-        combined[tag] += score * 1.0
-    for tag, score in ci.items():
-        combined[tag] += score * 0.9
+
+    def add(src: Dict[str, float], weight: float) -> None:
+        for tag, score in src.items():
+            combined[tag] = max(combined.get(tag, 0.0), score * weight)
+
+    add(wd, 1.0)
+    add(dd, 0.8)
+    add(ci, 0.7)
 
     normalized: Dict[str, float] = {}
     for tag, score in combined.items():
@@ -43,5 +49,4 @@ def merge_tags(dd: Dict[str, float], ci: Dict[str, float]) -> Dict[str, float]:
             normalized[canonical] = max(normalized[canonical], score)
         else:
             normalized[canonical] = score
-    # Return tags sorted by score descending for deterministic ordering
     return dict(sorted(normalized.items(), key=lambda x: x[1], reverse=True))
