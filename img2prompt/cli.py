@@ -1,44 +1,50 @@
 import argparse
 from pathlib import Path
 
-from .extract import florence, clip_interrogator, wd14
-from .assemble import normalize, bucketize, palette
+from .extract import blip, clip_interrogator, deepdanbooru
+from .assemble import normalize, bucketize, palette, style
 from .export import writer
 
 
 def run(image_path: str) -> Path:
     image_path = Path(image_path)
-    caption = florence.generate_caption(image_path)
-    tags = []
-    tags.extend(clip_interrogator.extract_tags(image_path))
-    tags.extend(wd14.extract_tags(image_path))
-    tags = normalize.normalize_tags(tags)
-    buckets = bucketize.bucketize(tags)
+    caption = blip.generate_caption(image_path)
+
+    dd_tags = deepdanbooru.extract_tags(image_path)
+    ci_tags = clip_interrogator.extract_tags(image_path)
+    merged = normalize.merge_tags(dd_tags, ci_tags)
+    buckets = bucketize.bucketize(merged)
+
     ordered = []
-    for key in ["subject", "appearance", "scene", "composition", "style_lighting"]:
+    for key in [
+        "subject",
+        "appearance",
+        "scene",
+        "composition",
+        "style_lighting",
+        "extra",
+    ]:
         ordered.extend(buckets.get(key, []))
     prompt = ", ".join(ordered)
+
+    style_name, params = style.determine_style(dd_tags, ci_tags)
+
     data = {
         "caption": caption,
         "prompt": prompt,
-        "negative_prompt": "low quality, worst quality, blurry, jpeg artifacts, watermark, text, extra fingers, deformed hands, bad anatomy",
-        "style": "anime",
-        "model_suggestion": "",
-        "params": {
-            "width": 0,
-            "height": 0,
-            "steps": 0,
-            "cfg_scale": 0,
-            "sampler": "",
-            "seed": "random",
-        },
+        "negative_prompt": (
+            "low quality, worst quality, blurry, jpeg artifacts, watermark, text, extra fingers, deformed hands, bad anatomy"
+        ),
+        "style": style_name,
+        "model_suggestion": "unspecified",
+        "params": params,
         "control_suggestions": {
-            "ip_adapter_reference": False,
+            "ip_adapter_reference": True,
             "openpose": False,
         },
         "meta": {
             "palette_hex": palette.extract_palette(image_path),
-            "tags_debug": {"stub": {t: 1.0 for t in ordered}},
+            "tags_debug": {"deepdanbooru": dd_tags, "clip_interrogator": ci_tags},
         },
     }
     out_path = image_path.with_name(image_path.name + ".prompt.json")

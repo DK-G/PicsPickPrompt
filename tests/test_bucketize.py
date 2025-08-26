@@ -7,9 +7,19 @@ sys.path.append(str(ROOT))
 from img2prompt.assemble import bucketize
 
 
-def test_bucketize_generates_minimum_tags():
-    tags = ["person", "hair", "outdoor", "close up", "soft lighting"]
+def test_bucketize_generates_target_size():
+    tags = {f"tag{i}": 1.0 for i in range(80)}
+    tags.update({
+        "person": 1.0,
+        "hair": 1.0,
+        "outdoor": 1.0,
+        "close up": 1.0,
+        "soft lighting": 1.0,
+    })
     buckets = bucketize.bucketize(tags)
-    assert all(len(v) >= 5 for v in buckets.values())
+    for key in ["subject", "appearance", "scene", "composition", "style_lighting"]:
+        assert len(buckets[key]) <= 10
     total = sum(len(v) for v in buckets.values())
     assert 50 <= total <= 70
+    all_tags = [t for bucket in buckets.values() for t in bucket]
+    assert len(all_tags) == len(set(all_tags))
