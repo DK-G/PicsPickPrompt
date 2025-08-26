@@ -2,7 +2,7 @@
 
 Prototype CLI utility to generate prompt JSON from an input image.
 
-The current prototype uses lightweight stand-ins for several common
+The current prototype runs real inference using the following
 extraction models:
 
 * **Florence-2** for caption generation
@@ -13,6 +13,14 @@ extraction models:
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+```
+
+On Windows use:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
