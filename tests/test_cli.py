@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+import string
 
 import pytest
 
@@ -18,19 +19,24 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
     # Stub model outputs
     monkeypatch.setattr(cli.blip, "generate_caption", lambda p: "a caption")
 
-    wd_tags = {f"tag{i}": 1.0 for i in range(20)}
+    letters = string.ascii_lowercase
+
+    def alpha_tag(i: int) -> str:
+        return "tag" + letters[i % 26] + letters[(i // 26) % 26]
+
+    wd_tags = {alpha_tag(i): 1.0 for i in range(20)}
     monkeypatch.setattr(cli.wd14_onnx, "extract_tags", lambda p: wd_tags)
 
-    dd_tags = {f"tag{i}": 1.0 for i in range(20, 40)}
+    dd_tags = {alpha_tag(i): 1.0 for i in range(20, 40)}
     dd_tags["subject_extra_1"] = 0.9
     monkeypatch.setattr(cli.deepdanbooru, "extract_tags", lambda p: dd_tags)
 
-    ci_tags = {f"tag{i}": 0.5 for i in range(40, 80)}
+    ci_tags = {alpha_tag(i): 0.5 for i in range(40, 80)}
     ci_tags["extra_tag_1"] = 0.8
     monkeypatch.setattr(
         cli.clip_interrogator,
         "extract_tags",
-        lambda p: (ci_tags, "soft lighting, 35mm"),
+        lambda p: (ci_tags, "soft lighting, 35mm", 0),
     )
 
     monkeypatch.setattr(
@@ -49,8 +55,13 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
         for t in tags
     )
     assert all(c != "#000000" for c in data["meta"]["palette_hex"])
-    assert "subject_extra_1" not in data["meta"]["tags_debug"]["deepdanbooru"]
-    assert "extra_tag_1" not in data["meta"]["tags_debug"]["clip_interrogator"]
+    dbg = data["meta"]["tags_debug"]
+    assert dbg["deepdanbooru"]["count"] == 20
+    assert dbg["deepdanbooru"]["ok"] is True
+    assert dbg["clip_interrogator"]["count"] == 40
+    assert dbg["clip_interrogator"]["fallback_chunks"] == 0
+    assert dbg["wd14_onnx"]["count"] == 20
+    assert dbg["wd14_onnx"]["ok"] is True
     assert data["style"] in {"anime", "photo"}
     params = data["params"]
     for key in ["width", "height", "steps", "cfg_scale"]:

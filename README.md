@@ -7,6 +7,7 @@
 * **Florence-2** : キャプション生成
 * **WD14** : アニメ向けタグ抽出
 * **CLIP Interrogator** : スタイルとライティングのヒント
+* **DeepDanbooru** (オプション) : 追加タグ抽出。Windowsでは `tensorflow-io` の問題により非推奨。必要な場合は `tensorflow-cpu==2.12.*` と `tensorflow-io-gcs-filesystem==0.31.0` を手動でインストールしてください。
 
 ## セットアップ
 

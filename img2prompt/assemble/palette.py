@@ -22,8 +22,11 @@ def extract_palette(path: Path, colors: int = 5) -> List[str]:
         from sklearn.cluster import KMeans
 
         image = Image.open(path).convert("RGB")
-        arr = np.array(image).reshape(-1, 3)
-        kmeans = KMeans(n_clusters=colors, n_init=10)
+        arr = np.array(image)
+        if arr.ndim != 3 or arr.shape[2] != 3 or arr.size < colors * 3:
+            raise ValueError("invalid image array")
+        arr = arr.reshape(-1, 3)
+        kmeans = KMeans(n_clusters=colors, n_init=4)
         kmeans.fit(arr)
         centres = kmeans.cluster_centers_.astype(int)
         hexes = ["#{:02x}{:02x}{:02x}".format(*c) for c in centres]
