@@ -1,17 +1,17 @@
 import argparse
 from pathlib import Path
 
-from .extract import blip, clip_interrogator, deepdanbooru
+from .extract import florence, clip_interrogator, wd14
 from .assemble import normalize, bucketize, palette
 from .export import writer
 
 
 def run(image_path: str) -> Path:
     image_path = Path(image_path)
-    caption = blip.generate_caption(image_path)
+    caption = florence.generate_caption(image_path)
     tags = []
     tags.extend(clip_interrogator.extract_tags(image_path))
-    tags.extend(deepdanbooru.extract_tags(image_path))
+    tags.extend(wd14.extract_tags(image_path))
     tags = normalize.normalize_tags(tags)
     buckets = bucketize.bucketize(tags)
     ordered = []
