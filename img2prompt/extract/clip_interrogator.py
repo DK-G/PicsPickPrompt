@@ -20,8 +20,8 @@ CANDIDATES = [
 ]
 
 
-def extract_tags(path: Path) -> Tuple[Dict[str, float], str]:
-    """Run the interrogator and return detected lighting/style tags and raw text."""
+def extract_tags(path: Path) -> Tuple[Dict[str, float], str, int]:
+    """Run the interrogator and return tags, raw text, and fallback count."""
     try:
         from clip_interrogator import Config, Interrogator
         from PIL import Image
@@ -64,10 +64,10 @@ def extract_tags(path: Path) -> Tuple[Dict[str, float], str]:
         for w in picks[:15]:
             result.setdefault(w, 0.50)
 
-        return result, text
+        return result, text, len(picks[:15])
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("CLIP Interrogator failed: %s", exc, exc_info=True)
-        return {}, ""
+        return {}, "", 0
 
 
 def extract_text(path: Path) -> str:
