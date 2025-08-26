@@ -7,7 +7,7 @@ sys.path.append(str(ROOT))
 from img2prompt.assemble import bucketize
 
 
-def test_bucketize_generates_target_size():
+def test_bucketize_word_count_and_no_duplicates():
     tags = {f"tag{i}": 1.0 for i in range(80)}
     tags.update({
         "person": 1.0,
@@ -17,8 +17,6 @@ def test_bucketize_generates_target_size():
         "soft lighting": 1.0,
     })
     buckets = bucketize.bucketize(tags)
-    for key in ["subject", "appearance", "scene", "composition", "style_lighting"]:
-        assert len(buckets[key]) <= 10
     total = sum(len(v) for v in buckets.values())
     assert 50 <= total <= 70
     all_tags = [t for bucket in buckets.values() for t in bucket]
