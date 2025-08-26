@@ -17,7 +17,16 @@
     "openpose": false
   },
   "meta": {
-    "palette_hex": ["#000000"],
-    "tags_debug": {"stub": {"1girl": 1.0}}
+    "palette_hex": [
+      "#112233",
+      "#445566",
+      "#778899",
+      "#aabbcc",
+      "#ddeeff"
+    ],
+    "tags_debug": {
+      "deepdanbooru": {"1girl": 1.0},
+      "clip_interrogator": {"soft lighting": 0.55}
+    }
   }
 }

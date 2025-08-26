@@ -10,8 +10,12 @@ def run(image_path: str) -> Path:
     image_path = Path(image_path)
     caption = blip.generate_caption(image_path)
 
-    dd_tags = deepdanbooru.extract_tags(image_path)
-    ci_tags = clip_interrogator.extract_tags(image_path)
+    # Extract and sanitise tags, removing any placeholder entries.
+    dd_raw = deepdanbooru.extract_tags(image_path)
+    ci_raw = clip_interrogator.extract_tags(image_path)
+    dd_tags = normalize.remove_placeholders(dd_raw)
+    ci_tags = normalize.remove_placeholders(ci_raw)
+
     merged = normalize.merge_tags(dd_tags, ci_tags)
     buckets = bucketize.bucketize(merged)
 
@@ -25,7 +29,13 @@ def run(image_path: str) -> Path:
         "extra",
     ]:
         ordered.extend(buckets.get(key, []))
-    prompt = ", ".join(ordered)
+
+    # Ensure prompt has between 50 and 70 tags by repeating existing tags if
+    # necessary. Bucketise already caps at 70 unique tags.
+    if ordered:
+        while len(ordered) < 50:
+            ordered.extend(ordered[: 50 - len(ordered)])
+    prompt = ", ".join(ordered[:70])
 
     style_name, params = style.determine_style(dd_tags, ci_tags)
 
