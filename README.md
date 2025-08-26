@@ -1,22 +1,21 @@
 # PicsPickPrompt
 
-Prototype CLI utility to generate prompt JSON from an input image.
+入力画像からプロンプト用の JSON ファイルを生成するためのプロトタイプ CLI ユーティリティです。
 
-The current prototype runs real inference using the following
-extraction models:
+このプロトタイプは以下の抽出モデルを用いて推論を実行します。
 
-* **Florence-2** for caption generation
-* **WD14** for anime-focused tagging
-* **CLIP Interrogator** for style and lighting hints
+* **Florence-2** : キャプション生成
+* **WD14** : アニメ向けタグ抽出
+* **CLIP Interrogator** : スタイルとライティングのヒント
 
-## Setup
+## セットアップ
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-On Windows use:
+Windows の場合:
 
 ```powershell
 python -m venv .venv
@@ -24,27 +23,27 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Usage
+## 使い方
 
 ```bash
 python -m img2prompt.cli path/to/image.jpg
 ```
 
-On Windows PowerShell or Command Prompt the command is the same:
+Windows の PowerShell やコマンドプロンプトでも同じコマンドを使用します:
 
 ```powershell
 python -m img2prompt.cli path\to\image.jpg
 ```
 
-The command writes `path/to/image.jpg.prompt.json` containing the prompt data.
+実行すると `path/to/image.jpg.prompt.json` が生成され、抽出したプロンプトデータが保存されます。
 
-Example:
+### 実行例
 
 ```bash
 $ python -m img2prompt.cli examples/sample.jpg
 ```
 
-The resulting `examples/sample.jpg.prompt.json` looks like:
+生成される `examples/sample.jpg.prompt.json` の内容例:
 
 ```json
 {
@@ -55,13 +54,3 @@ The resulting `examples/sample.jpg.prompt.json` looks like:
   "model_suggestion": "unspecified"
 }
 ```
-
-## 使い方
-
-以下のコマンドで、入力画像からプロンプトのJSONファイルを生成します。
-
-```bash
-python -m img2prompt.cli path/to/image.jpg
-```
-
-実行すると `path/to/image.jpg.prompt.json` が作成され、画像から抽出したプロンプト情報が保存されます。
