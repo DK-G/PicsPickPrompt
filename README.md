@@ -30,6 +30,12 @@ pip install -r requirements.txt
 python -m img2prompt.cli path/to/image.jpg
 ```
 
+On Windows PowerShell or Command Prompt the command is the same:
+
+```powershell
+python -m img2prompt.cli path\to\image.jpg
+```
+
 The command writes `path/to/image.jpg.prompt.json` containing the prompt data.
 
 ## 使い方
