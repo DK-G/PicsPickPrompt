@@ -23,7 +23,7 @@ def _load() -> None:
         _tags = dd.project.load_tags_from_project(project_path)
         _model.eval()
     except Exception as exc:  # pragma: no cover - fallback path
-        logger.exception("Failed to load DeepDanbooru model: %s", exc)
+        logger.warning("Failed to load DeepDanbooru model: %s", exc)
         _model = None
         _tags = None
 
@@ -57,5 +57,5 @@ def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
                 result[tag] = float(score)
         return result
     except Exception as exc:  # pragma: no cover - fallback path
-        logger.exception("DeepDanbooru inference failed: %s", exc)
+        logger.warning("DeepDanbooru inference failed: %s", exc)
         return {}

@@ -5,6 +5,7 @@ pillow
 transformers
 timm
 einops
+numpy
 
 clip-interrogator==0.6.0
 open-clip-torch
