@@ -115,7 +115,7 @@ def write_prompt(path: Path, data: dict) -> None:
         validate_prompt(data)
         to_write = data
     except Exception as exc:  # pragma: no cover - fallback path
-        logger.exception("Prompt validation failed: %s", exc)
+        logger.warning("Prompt validation failed: %s", exc)
         to_write = DEFAULT_DATA
 
     path = Path(path)

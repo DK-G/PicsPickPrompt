@@ -36,5 +36,5 @@ def extract_tags(path: Path) -> Dict[str, float]:
                 result[cand] = 0.55
         return result
     except Exception as exc:  # pragma: no cover - fallback path
-        logger.exception("CLIP Interrogator failed: %s", exc)
+        logger.warning("CLIP Interrogator failed: %s", exc)
         return {}
