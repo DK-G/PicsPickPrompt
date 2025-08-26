@@ -1,0 +1,23 @@
+{
+  "caption": "a placeholder caption",
+  "prompt": "tag1, tag2",
+  "negative_prompt": "low quality",
+  "style": "anime",
+  "model_suggestion": "",
+  "params": {
+    "width": 0,
+    "height": 0,
+    "steps": 0,
+    "cfg_scale": 0,
+    "sampler": "",
+    "seed": "random"
+  },
+  "control_suggestions": {
+    "ip_adapter_reference": false,
+    "openpose": false
+  },
+  "meta": {
+    "palette_hex": ["#000000"],
+    "tags_debug": {"stub": {"tag1": 1.0}}
+  }
+}
