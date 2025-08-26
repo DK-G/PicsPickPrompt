@@ -1,23 +1,23 @@
 {
-  "caption": "a placeholder caption",
-  "prompt": "tag1, tag2",
-  "negative_prompt": "low quality",
+  "caption": "a girl smiling",
+  "prompt": "1girl, smile, outdoor",
+  "negative_prompt": "low quality, worst quality",
   "style": "anime",
-  "model_suggestion": "",
+  "model_suggestion": "unspecified",
   "params": {
-    "width": 0,
-    "height": 0,
-    "steps": 0,
-    "cfg_scale": 0,
-    "sampler": "",
+    "width": 768,
+    "height": 1024,
+    "steps": 28,
+    "cfg_scale": 6.5,
+    "sampler": "Euler a",
     "seed": "random"
   },
   "control_suggestions": {
-    "ip_adapter_reference": false,
+    "ip_adapter_reference": true,
     "openpose": false
   },
   "meta": {
     "palette_hex": ["#000000"],
-    "tags_debug": {"stub": {"tag1": 1.0}}
+    "tags_debug": {"stub": {"1girl": 1.0}}
   }
 }
