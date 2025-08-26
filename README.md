@@ -16,6 +16,26 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Windows
+
+PowerShell:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m img2prompt.cli path\to\image.jpg
+```
+
+Command Prompt:
+
+```cmd
+py -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+python -m img2prompt.cli path\to\image.jpg
+```
+
 ## Usage
 
 ```bash

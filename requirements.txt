@@ -5,4 +5,5 @@ timm
 einops
 clip-interrogator==0.6.0
 onnxruntime
+pillow
 scikit-learn

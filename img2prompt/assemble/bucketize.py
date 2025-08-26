@@ -1,3 +1,4 @@
+from itertools import cycle
 from typing import Dict, List
 
 # Seed tags for each bucket. These mirror the values that previously
@@ -69,11 +70,20 @@ def bucketize(tags: List[str]) -> Dict[str, List[str]]:
         for seed in seeds:
             if seed in remaining and seed not in buckets[bucket]:
                 buckets[bucket].append(seed)
+        filler_cycle = cycle(seeds)
         while len(buckets[bucket]) < 5:
-            filler = f"{bucket}_extra_{len(buckets[bucket]) + 1}"
-            buckets[bucket].append(filler)
+            filler = next(filler_cycle)
+            if filler not in buckets[bucket]:
+                buckets[bucket].append(filler)
+
     total = sum(len(v) for v in buckets.values())
-    extras_needed = max(0, 50 - total)
-    for i in range(extras_needed):
-        buckets["subject"].append(f"extra_tag_{i+1}")
+    if total < 50:
+        all_seeds = [s for seeds in BUCKET_SEEDS.values() for s in seeds]
+        filler_cycle = cycle(all_seeds)
+        while total < 50:
+            buckets["subject"].append(next(filler_cycle))
+            total += 1
+    if total > 70:
+        excess = total - 70
+        buckets["subject"] = buckets["subject"][:-excess]
     return buckets
