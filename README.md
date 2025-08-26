@@ -2,6 +2,13 @@
 
 Prototype CLI utility to generate prompt JSON from an input image.
 
+The current prototype uses lightweight stand-ins for several common
+extraction models:
+
+* **Florence-2** for caption generation
+* **WD14** for anime-focused tagging
+* **CLIP Interrogator** for style and lighting hints
+
 ## Setup
 
 ```bash
