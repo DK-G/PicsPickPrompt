@@ -32,6 +32,6 @@ def extract_palette(path: Path, colors: int = 5) -> List[str]:
         cleaned = [h if h.lower() != "#000000" else "#010101" for h in hexes]
         return cleaned[:colors]
     except Exception as exc:  # pragma: no cover - fallback path
-        logger.warning("Palette extraction failed: %s", exc)
+        logger.warning("Palette extraction failed: %s", exc, exc_info=True)
         fallback = ["#010101", "#020202", "#030303", "#040404", "#050505"]
         return fallback[:colors]

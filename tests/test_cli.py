@@ -17,13 +17,21 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
 
     # Stub model outputs
     monkeypatch.setattr(cli.blip, "generate_caption", lambda p: "a caption")
-    dd_tags = {f"tag{i}": 1.0 for i in range(40)}
+
+    wd_tags = {f"tag{i}": 1.0 for i in range(20)}
+    monkeypatch.setattr(cli.wd14_onnx, "extract_tags", lambda p: wd_tags)
+
+    dd_tags = {f"tag{i}": 1.0 for i in range(20, 40)}
     dd_tags["subject_extra_1"] = 0.9
     monkeypatch.setattr(cli.deepdanbooru, "extract_tags", lambda p: dd_tags)
 
     ci_tags = {f"tag{i}": 0.5 for i in range(40, 80)}
     ci_tags["extra_tag_1"] = 0.8
-    monkeypatch.setattr(cli.clip_interrogator, "extract_tags", lambda p: ci_tags)
+    monkeypatch.setattr(
+        cli.clip_interrogator,
+        "extract_tags",
+        lambda p: (ci_tags, "soft lighting, 35mm"),
+    )
 
     monkeypatch.setattr(
         cli.palette,
