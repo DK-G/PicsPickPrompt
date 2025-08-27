@@ -52,6 +52,6 @@ def test_is_bad_token_meta_exact_and_finalize():
 
     # ensure finalize fills with safe tokens only
     base = ["portrait"]
-    out = finalize_prompt_safe(base.copy(), min_total=5, max_total=10)
+    out = finalize_prompt_safe(base.copy(), min_tokens=5, max_tokens=10)
     assert len(out) >= 5
     assert all(t in SAFE_FILL or t == "portrait" for t in out)

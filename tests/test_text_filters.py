@@ -10,6 +10,7 @@ from img2prompt.utils.text_filters import (
     clean_tokens,
     dedupe_background,
     drop_contradictions,
+    compress_redundant,
     finalize_pipeline,
     is_bad_token,
     unify_background,
@@ -178,6 +179,35 @@ def test_unify_background_groups_synonyms():
     out = unify_background(tokens)
     backgrounds = [t for t in out if "background" in t or "backdrop" in t]
     assert backgrounds == ["clean background"]
+
+
+def test_compress_redundant_merges_similar_terms():
+    tokens = [
+        "warm tones",
+        "warm color palette",
+        "soft contrast",
+        "low contrast look",
+        "depth of field",
+        "shallow depth",
+        "subtle bokeh",
+        "creamy bokeh",
+        "balanced composition",
+        "negative space balance",
+        "fine details",
+        "surface detail",
+        "realistic texture",
+        "natural rendition",
+        "clean rendition",
+    ]
+    out = compress_redundant(tokens)
+    assert "warm tones" in out and "warm color palette" not in out
+    assert "soft contrast" in out and "low contrast look" not in out
+    assert "shallow depth" in out and "depth of field" not in out
+    assert "subtle bokeh" in out and "creamy bokeh" not in out
+    assert "balanced composition" in out and "negative space balance" not in out
+    assert "fine details" in out and "surface detail" not in out
+    assert "realistic texture" in out
+    assert "natural rendition" not in out and "clean rendition" not in out
 
 
 def test_sync_caption_to_prompt_removes_unused_objects():
