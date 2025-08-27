@@ -113,41 +113,72 @@ def bucketize(tags: Dict[str, float]) -> Dict[str, List[str]]:
     return buckets
 
 
-def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str]) -> List[str]:
-    """Ensure the final prompt tag list has between 50 and 70 entries.
+FLOOR = [
+    "portrait",
+    "upper body",
+    "looking at camera",
+    "soft lighting",
+    "warm tones",
+    "sharp focus",
+    "depth of field",
+    "wooden interior",
+    "window light",
+    "cozy atmosphere",
+    "warm highlights",
+    "gentle shadow",
+]
 
-    The input ``tags`` is the ordered list from bucketization. Additional
-    phrases are sourced from the BLIP caption and CLIP Interrogator fallback
-    phrases. A small set of fixed words provides a safety net when the list
-    is still too short.
-    """
+FILLER_BANK = [
+    "natural skin tones",
+    "subtle shadows",
+    "ambient light",
+    "clean background",
+    "balanced composition",
+    "eye level view",
+    "soft contrast",
+    "realistic texture",
+    "warm color palette",
+    "fine details",
+    "cinematic feel",
+    "subtle bokeh",
+]
+
+
+def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str]) -> List[str]:
+    """Return a tag list of between 50 and 70 entries without looping."""
+
+    tags = strip_names(
+        [t.strip(", ").lower() for t in tags if t and 2 <= len(t) <= 40]
+    )
 
     nounish = [
         p.strip()
         for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
         if 1 <= len(p.split()) <= 4
     ]
-    extra = (ci_picks or [])[:15]
-    floor = [
-        "portrait",
-        "upper body",
-        "looking at camera",
-        "soft lighting",
-        "warm tones",
-        "sharp focus",
-        "depth of field",
-        "wooden interior",
-        "window light",
-        "cozy atmosphere",
-        "warm highlights",
-        "gentle shadow",
-    ]
+    nounish = strip_names(nounish)
 
-    out = list(dict.fromkeys(tags + nounish[:20] + extra + floor))
-    out = [t.strip(", ") for t in out if 2 <= len(t) <= 40]
-    out = strip_names(out)
-    if len(out) < 50:
-        while len(out) < 50:
-            out += [w for w in floor if w not in out]
-            out = out[:50]
-    return out[:70]
+    ci_picks = strip_names(ci_picks[:15] if ci_picks else [])
+
+    merged: List[str] = []
+
+    def add_many(cands: List[str], limit: int | None = None) -> None:
+        nonlocal merged
+        for w in cands:
+            w = w.strip(", ").lower()
+            if 2 <= len(w) <= 40 and w not in merged:
+                merged.append(w)
+                if limit and len(merged) >= limit:
+                    break
+
+    add_many(tags)
+    if len(merged) < 50:
+        add_many(nounish, limit=50)
+    if len(merged) < 50:
+        add_many(ci_picks, limit=50)
+    if len(merged) < 50:
+        add_many(FLOOR, limit=50)
+    if len(merged) < 50:
+        add_many(FILLER_BANK, limit=50)
+
+    return merged[:70]

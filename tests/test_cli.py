@@ -36,7 +36,7 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli.clip_interrogator,
         "extract_tags",
-        lambda p: (ci_tags, "soft lighting, 35mm"),
+        lambda p: (ci_tags, list(ci_tags)[:15], "soft lighting, 35mm"),
     )
 
     monkeypatch.setattr(
@@ -92,7 +92,7 @@ def test_cli_handles_deepdanbooru_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli.clip_interrogator,
         "extract_tags",
-        lambda p: (ci_tags, "soft lighting, 35mm"),
+        lambda p: (ci_tags, list(ci_tags)[:15], "soft lighting, 35mm"),
     )
 
     monkeypatch.setattr(
