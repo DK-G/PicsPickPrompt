@@ -1,133 +1,131 @@
-import unicodedata, re
+import re, unicodedata
 
-# TitleCase 姓名検出
-NAME_TITLECASE = re.compile(r"\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b")
 NUMERIC_PAT = re.compile(r"^\d+$")
 
-# 既知のアーティスト・人名（大文字小文字や空白崩れを許容）
+# --- 1) 人名判定：小文字・空白崩れ・軽微typoのみ（過剰マッチ防止のため距離≤1） ---
 ARTIST_TOKENS = {
     "Ayami Kojima","Rei Hiroe","Shiori Teshirogi","Tsugumi Ohba",
     "Tsukasa Dokite","Omina Tachibana","Kohei Murata",
     "Makoto Shinkai","Erika Ikuta","Harumi",
-    # 単語（小文字化比較で弾く）
-    "Ayami","Kojima","Ohba","Teshirogi","Hiroe",
-    "Dokite","Tachibana","Ikuta","Shinkai",
+    # 単語だけで来るケースも弾く
+    "Ayami","Kojima","Ohba","Teshirogi","Hiroe","Dokite","Tachibana","Ikuta","Shinkai",
 }
-# 小文字・空白除去済みの比較セット
-_ART_LOWER_NOWS = {
-    unicodedata.normalize("NFKC", a).lower().replace(" ", "")
-    for a in ARTIST_TOKENS
-}
+_ART_NOWS = {unicodedata.normalize("NFKC", a).lower().replace(" ", "") for a in ARTIST_TOKENS}
 
-# 線画/アニメ系ノイズ
-BAN_SUBSTR = {
-    "comic","manga","cartoon",
-    "lineart","sketch","monochrome","grayscale","greyscale","sensitive"
-}
-
-# メタ・文章系ノイズ
-META_EXACT = {
-    "artist name","twitter username","page number","general","dated",
-    "text focus","no humans","multiple girls",
-}
-BAN_PHRASES_SUBSTR = {
-    "beautiful japanese girls face",
-}
-BAN_EXACT = {"standing","solo","1girl","1boy"}
-
-# 写真系ホワイトリスト（二語フレーズ）
-SAFE_TWO_WORDS = {
-    "upper body","soft lighting","warm tones","sharp focus","depth of field",
-    "wooden interior","window light","cozy atmosphere","warm highlights",
-    "gentle shadow","natural skin","ambient light","balanced composition",
-    "eye level","soft contrast","realistic texture","color palette",
-    "fine details","cinematic feel","subtle bokeh","clean background",
-    "subtle shadows","smooth gradients","natural highlights","muted colors",
-    "shallow depth","soft focus"
-}
-
-def _nfkc_lower(s: str) -> str:
-    return unicodedata.normalize("NFKC", s).strip(" ,.;:").lower()
-
-def _lev(a: str, b: str) -> int:
-    la, lb = len(a), len(b)
-    if la == 0:
-        return lb
-    if lb == 0:
-        return la
-    prev = list(range(lb + 1))
-    for i, ca in enumerate(a, 1):
-        cur = [i] + [0] * lb
-        for j, cb in enumerate(b, 1):
-            ins = cur[j - 1] + 1
-            delete = prev[j] + 1
-            replace = prev[j - 1] + (ca != cb)
-            cur[j] = min(ins, delete, replace)
-        prev = cur
-    return prev[lb]
-
+def _lev1(a: str, b: str) -> bool:
+    # レーベンシュタイン距離 ≤1（高速・過剰除外を避ける）
+    if a == b:
+        return True
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        diff = [(x, y) for x, y in zip(a, b) if x != y]
+        if len(diff) == 1:
+            return True  # 置換1回
+        if len(diff) == 2 and diff[0][0] == diff[1][1] and diff[0][1] == diff[1][0]:
+            return True  # 2文字の入れ替え
+        return False
+    # 長さ差1の場合: 挿入/削除1回
+    if len(a) < len(b):
+        a, b = b, a
+    i = j = edits = 0
+    while i < len(a) and j < len(b):
+        if a[i] == b[j]:
+            i += 1; j += 1
+        else:
+            edits += 1
+            if edits > 1:
+                return False
+            i += 1  # aが長いので削除
+    return True
 
 def _looks_like_artist(raw: str) -> bool:
     s = unicodedata.normalize("NFKC", raw).lower()
     nos = s.replace(" ", "")
-    if nos in _ART_LOWER_NOWS:
+    if nos in _ART_NOWS:
         return True
-    for tgt in _ART_LOWER_NOWS:
-        if abs(len(nos) - len(tgt)) <= 2 and _lev(nos, tgt) <= 2:
+    # 軽微typoのみ許容（距離≤1）
+    for tgt in _ART_NOWS:
+        if _lev1(nos, tgt):
             return True
-    return bool(NAME_TITLECASE.search(raw))
+    return False
+
+# --- 2) 写真語ホワイトリスト（先に通す） ---
+SAFE_SUBSTR = {
+    "lighting","bokeh","focus","depth of field","window light","eye level",
+    "warm tones","skin tones","highlights","shadows","gradients","texture",
+    "contrast","composition","cinematic","realistic","color palette",
+    "upper body","looking at camera","cozy atmosphere","wooden interior",
+}
+SAFE_EXACT = {
+    "portrait","upper body","looking at camera","soft lighting","warm tones",
+    "sharp focus","depth of field","window light","cozy atmosphere","warm highlights",
+    "gentle shadow","natural skin tones","ambient light","balanced composition",
+    "eye level view","soft contrast","realistic texture","warm color palette",
+    "fine details","cinematic feel","subtle bokeh","subtle shadows","smooth gradients",
+    "natural highlights","muted colors","shallow depth","soft focus",
+}
+
+# --- 3) 落とす語（最小限&明示） ---
+BAN_SUBSTR = {
+    "comic","manga","cartoon","lineart","sketch","monochrome","grayscale","greyscale","sensitive",
+}
+BAN_EXACT = {"standing","solo","1girl","1boy"}
+META_EXACT = {"artist name","twitter username","page number","general","dated","negative space"}
+BAN_PHRASES_SUBSTR = {"beautiful japanese girls face"}
+
+def _nfkc_lower(s: str) -> str:
+    return unicodedata.normalize("NFKC", s).strip(" ,.;:").lower()
 
 def clean_tokens(tokens):
     out, seen = [], set()
-    background_seen = False
+    bg_kept = False
 
     for raw in tokens:
-        if not raw:
+        if not raw: 
             continue
-
         t_raw = raw.strip()
         t = _nfkc_lower(t_raw)
-        safe = t in SAFE_TWO_WORDS
 
-        if not safe:
-            # ❌ 人名/作家名除去
-            if _looks_like_artist(t_raw):
-                continue
+        # ✅ 先にホワイトリスト（写真語）は無条件通過（人名判定より先！）
+        if (t in SAFE_EXACT) or any(key in t for key in SAFE_SUBSTR):
+            if t not in seen:
+                seen.add(t); out.append(t)
+            continue
 
-            # ❌ 数値/短すぎ長すぎ
-            if not (2 <= len(t) <= 40):
-                continue
-            if NUMERIC_PAT.match(t):
-                continue
+        # ❌ 人名（軽微typo含む）
+        if _looks_like_artist(t_raw):
+            continue
 
-            # ❌ 線画/アニメ系ノイズ
-            if any(b in t for b in BAN_SUBSTR):
-                continue
+        # ❌ 数値/長さ
+        if not (2 <= len(t) <= 40): 
+            continue
+        if NUMERIC_PAT.match(t):
+            continue
 
-            # ❌ メタ・文章系ノイズ
-            if t in META_EXACT:
-                continue
-            if any(p in t for p in BAN_PHRASES_SUBSTR):
-                continue
-            if t in BAN_EXACT:
-                continue
+        # ❌ アニメ/線画系
+        if any(b in t for b in BAN_SUBSTR):
+            continue
 
-        # ❌ 背景タグは1つだけ残す
+        # ❌ メタ・文章・カウント
+        if t in META_EXACT or t in BAN_EXACT:
+            continue
+        if any(p in t for p in BAN_PHRASES_SUBSTR):
+            continue
+
+        # ❌ 背景は1つだけ
         if "background" in t:
-            if background_seen:
+            if bg_kept:
                 continue
-            background_seen = True
+            bg_kept = True
 
-        # ✅ 重複排除
         if t not in seen:
             seen.add(t); out.append(t)
-
     return out
 
-
+# --- 4) ensure_50_70の後に背景重複を最終整理（補完で再注入された分を落とす） ---
 def dedupe_background(tags):
-    out = []
-    seen_bg = False
+    out, seen_bg = [], False
     for t in tags:
         if "background" in t:
             if seen_bg:
