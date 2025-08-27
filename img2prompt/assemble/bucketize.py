@@ -1,7 +1,6 @@
 from typing import Dict, List
 import re
 
-from ..utils.text_filters import strip_names
 
 # Seed tags for each bucket used for initial categorisation.
 BUCKET_SEEDS: Dict[str, List[str]] = {
@@ -147,24 +146,17 @@ FILLER_BANK = [
 def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str]) -> List[str]:
     """Return a tag list of between 50 and 70 entries without looping."""
 
-    tags = strip_names(
-        [t.strip(", ").lower() for t in tags if t and 2 <= len(t) <= 40]
-    )
-
     nounish = [
         p.strip()
         for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
         if 1 <= len(p.split()) <= 4
     ]
-    nounish = strip_names(nounish)
-
-    ci_picks = strip_names(ci_picks[:15] if ci_picks else [])
 
     merged: List[str] = []
 
-    def add_many(cands: List[str], limit: int | None = None) -> None:
+    def add_many(src: List[str], limit: int | None = None) -> None:
         nonlocal merged
-        for w in cands:
+        for w in src:
             w = w.strip(", ").lower()
             if 2 <= len(w) <= 40 and w not in merged:
                 merged.append(w)
@@ -175,7 +167,7 @@ def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str]) -> List[str
     if len(merged) < 50:
         add_many(nounish, limit=50)
     if len(merged) < 50:
-        add_many(ci_picks, limit=50)
+        add_many(ci_picks or [], limit=50)
     if len(merged) < 50:
         add_many(FLOOR, limit=50)
     if len(merged) < 50:

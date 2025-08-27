@@ -1,9 +1,7 @@
 """Tag normalization and merging utilities."""
 
 from collections import defaultdict
-from typing import Dict, List
-
-from ..utils.text_filters import strip_names
+from typing import Dict
 
 SYNONYMS = {
     "serafuku": "school uniform",
@@ -15,12 +13,7 @@ PLACEHOLDER_PREFIXES = ("subject_extra_", "extra_tag_")
 
 
 def remove_placeholders(tags: Dict[str, float]) -> Dict[str, float]:
-    """Remove any placeholder tags from ``tags``.
-
-    Placeholders such as ``subject_extra_1`` or ``extra_tag_2`` were used in
-    earlier versions to pad prompts. They must be excluded to produce clean
-    outputs compliant with the acceptance criteria.
-    """
+    """Remove any placeholder tags from ``tags``."""
 
     return {
         tag: score
@@ -29,9 +22,7 @@ def remove_placeholders(tags: Dict[str, float]) -> Dict[str, float]:
     }
 
 
-def merge_tags(
-    wd: Dict[str, float], dd: Dict[str, float], ci: Dict[str, float]
-) -> Dict[str, float]:
+def merge_tags(wd: Dict[str, float], dd: Dict[str, float], ci: Dict[str, float]) -> Dict[str, float]:
     """Merge tag sources with weighting."""
 
     combined: Dict[str, float] = defaultdict(float)
@@ -53,12 +44,3 @@ def merge_tags(
             normalized[canonical] = score
     return dict(sorted(normalized.items(), key=lambda x: x[1], reverse=True))
 
-
-def strip_name_tokens(tags: List[str]) -> List[str]:
-    """Remove personal names or banned tokens from ``tags``.
-
-    This uses simple heuristics to filter out two-word western style
-    names and known bad tokens that should not appear in prompts.
-    """
-
-    return strip_names(tags)
