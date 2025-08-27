@@ -271,6 +271,7 @@ def drop_contradictions(tags: list[str]) -> list[str]:
     if "rule of thirds" in s and "centered composition" in s:
         # 迷ったら映える「rule of thirds」を優先
         s.discard("centered composition")
+    # balanced と centered が同居したら centered を落とす
     if "balanced composition" in s and "centered composition" in s:
         s.discard("centered composition")
 
@@ -290,7 +291,7 @@ def drop_contradictions(tags: list[str]) -> list[str]:
 
 def adjust_framing_for_cues(tokens: list[str]) -> list[str]:
     s = {t.lower().strip() for t in tokens}
-    if s & UPPER_BODY_CUES and "loose framing" in s and "tight framing" not in s:
+    if s & UPPER_BODY_CUES and "loose framing" in s:
         return [
             "tight framing" if t.lower().strip() == "loose framing" else t
             for t in tokens
@@ -314,6 +315,7 @@ REDUNDANT_GROUPS = [
 REDUNDANT_GROUPS += [
     {"gentle tonality", "soft tonality"},
     {"realistic texture", "natural rendition", "clean rendition"},
+    {"window light", "window light pattern"},
 ]
 
 PREFER_ORDER = {
@@ -332,6 +334,7 @@ PREFER_ORDER.update(
     {
         "gentle tonality": 0,
         "realistic texture": 0,
+        "window light": 0,
     }
 )
 

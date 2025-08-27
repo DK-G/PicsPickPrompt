@@ -207,6 +207,8 @@ def test_compress_redundant_merges_similar_terms():
         "soft shadows",
         "gentle tonality",
         "soft tonality",
+        "window light",
+        "window light pattern",
     ]
     out = compress_redundant(tokens)
     assert "warm tones" in out and "warm color palette" not in out
@@ -219,6 +221,7 @@ def test_compress_redundant_merges_similar_terms():
     assert "realistic texture" in out and "natural rendition" not in out and "clean rendition" not in out
     assert "gentle shadow" in out and "subtle shadows" not in out and "soft shadows" not in out
     assert "gentle tonality" in out and "soft tonality" not in out
+    assert "window light" in out and "window light pattern" not in out
 
 
 def test_sync_caption_to_prompt_removes_unused_objects():
