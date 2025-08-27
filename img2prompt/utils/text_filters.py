@@ -15,8 +15,26 @@ ARTIST_TOKENS = {
 
 # 線画/アニメ系の“除外候補”（サブストリングOK）
 BAN_SUBSTR = {
-    "1girl","1boy","solo","comic","manga","cartoon","lineart","sketch",
+    "comic","manga","cartoon","lineart","sketch",
     "monochrome","grayscale","greyscale","sensitive"
+}
+
+# メタ情報や曖昧表現など、完全一致で弾く語
+META_EXACT = {
+    "artist name",
+    "twitter username",
+    "page number",
+    "text focus",
+    "negative space",
+    "no humans",
+    "multiple girls",
+    "general",
+    "dated",
+}
+
+# 宣伝や曖昧語など、部分一致で弾くフレーズ（英語のみ想定）
+BAN_PHRASES_SUBSTR = {
+    "beautiful japanese girls face",
 }
 
 # 写真系の“二語フレーズ”は明示ホワイトリストで必ず通す
@@ -46,7 +64,7 @@ def _is_artist_like(raw: str) -> bool:
 def clean_tokens(tokens):
     out, seen = [], set()
     for raw in tokens:
-        if not raw: 
+        if not raw:
             continue
         # ホワイトリスト先行：写真系二語は無条件で通す
         if _nfkc_lower(raw) in SAFE_TWO_WORDS:
@@ -64,6 +82,14 @@ def clean_tokens(tokens):
         if NUMERIC_PAT.match(t):              # 純数値は除外
             continue
         if any(b in t for b in BAN_SUBSTR):   # 線画/アニメ系ノイズ
+            continue
+
+        # 追加ノイズ除去
+        if t in META_EXACT:                   # メタ情報など
+            continue
+        if any(p in t for p in BAN_PHRASES_SUBSTR):  # 宣伝/曖昧語
+            continue
+        if t in {"standing", "1girl", "1boy", "solo"}:  # カウント系
             continue
 
         if t not in seen:

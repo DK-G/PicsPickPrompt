@@ -5,12 +5,13 @@ import logging
 from .extract import blip, clip_interrogator, deepdanbooru, wd14_onnx
 from .assemble import normalize, bucketize, palette, style
 from .utils.text_filters import clean_tokens
+from .options.style_presets import apply_style, STYLE_PRESETS
 from .export import writer
 
 logger = logging.getLogger(__name__)
 
 
-def run(image_path: str) -> Path:
+def run(image_path: str, style_preset: str | None = None) -> Path:
     image_path = Path(image_path)
     caption = blip.generate_caption(image_path)
 
@@ -72,6 +73,10 @@ def run(image_path: str) -> Path:
         prompt_tags, caption, ci_picks, min_total=55, max_total=70
     )
     final_count = len(prompt_tags)
+    if style_preset:
+        prompt_tags = apply_style(prompt_tags, style_preset)
+        if len(prompt_tags) > 70:
+            prompt_tags = prompt_tags[:70]
     prompt = ", ".join(prompt_tags)
 
     style_name, params = style.determine_style(ci_raw, wd14_tags)
@@ -108,8 +113,9 @@ def run(image_path: str) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate prompt JSON from an image")
     parser.add_argument("image", help="Path to input image")
+    parser.add_argument("--style", choices=STYLE_PRESETS.keys(), help="Style preset", default=None)
     args = parser.parse_args()
-    out = run(args.image)
+    out = run(args.image, style_preset=args.style)
     print(out)
 
 
