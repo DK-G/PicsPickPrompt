@@ -36,5 +36,11 @@ def extract_palette(path: Path, colors: int = 5) -> List[str]:
         return cleaned[:colors]
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("Palette extraction failed: %s", exc, exc_info=True)
-        fallback = ["#2a3d6d", "#dcb187", "#a56c4a", "#f2d6b0", "#1c1c1c"]
+        fallback = [
+            "#2a3d6d",
+            "#ddc6ae",
+            "#a5806c",
+            "#5c4032",
+            "#2c455b",
+        ]
         return fallback[:colors]

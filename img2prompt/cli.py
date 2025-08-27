@@ -27,9 +27,12 @@ def run(image_path: str) -> Path:
         tags_debug["wd14_onnx"] = {"count": 0, "ok": False, "error": str(exc)}
 
     try:
-        dd_raw = deepdanbooru.extract_tags(image_path)
+        dd_raw, dd_err = deepdanbooru.extract_tags(image_path)
         dd_tags = normalize.remove_placeholders(dd_raw)
-        tags_debug["deepdanbooru"] = {"count": len(dd_tags), "ok": True}
+        dbg = {"count": len(dd_tags), "ok": dd_err is None}
+        if dd_err:
+            dbg["error"] = dd_err
+        tags_debug["deepdanbooru"] = dbg
     except Exception as exc:  # pragma: no cover - should be rare
         logger.warning("DeepDanbooru extractor failed: %s", exc, exc_info=True)
         dd_tags = {}
@@ -106,9 +109,11 @@ def run(image_path: str) -> Path:
             "portrait",
         }
 
+        NAME_RE = re.compile(r"\b[a-z][a-z]+ [a-z][a-z]+\b", re.I)
+
         def looks_like_name(phrase: str) -> bool:
-            parts = phrase.split()
-            if len(parts) == 2 and all(p.isalpha() for p in parts):
+            if NAME_RE.fullmatch(phrase):
+                parts = phrase.split()
                 if not any(p in NAME_EXCEPTIONS for p in parts):
                     return True
             return False
@@ -162,6 +167,9 @@ def run(image_path: str) -> Path:
                 "depth of field",
                 "wooden interior",
                 "window light",
+                "cozy atmosphere",
+                "warm highlights",
+                "gentle shadow",
             ]
             for w in fallback:
                 if w not in tags:

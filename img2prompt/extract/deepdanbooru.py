@@ -1,7 +1,7 @@
 """Tag extraction using the official DeepDanbooru project."""
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,12 +23,17 @@ def _load() -> None:
     _model.eval()
 
 
-def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
-    """Return tags and scores for ``path``."""
+def extract_tags(path: Path, threshold: float = 0.35) -> Tuple[Dict[str, float], Optional[str]]:
+    """Return tags and an optional error message for ``path``."""
 
-    _load()
+    try:
+        _load()
+    except Exception as exc:  # pragma: no cover - load failures
+        logger.warning("DeepDanbooru load failed: %s", exc, exc_info=True)
+        return {}, str(exc)
+
     if _model is None or _tags is None:
-        raise RuntimeError("DeepDanbooru model unavailable")
+        return {}, "DeepDanbooru model unavailable"
 
     try:
         from PIL import Image
@@ -47,6 +52,7 @@ def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
             if score >= threshold and not tag.startswith("rating:"):
                 tag = tag.replace("_", " ")
                 result[tag] = float(score)
-        return result
+        return result, None
     except Exception as exc:  # pragma: no cover - inference failures
-        raise RuntimeError(str(exc)) from exc
+        logger.warning("DeepDanbooru inference failed: %s", exc, exc_info=True)
+        return {}, str(exc)

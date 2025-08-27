@@ -1,6 +1,6 @@
 """WD14 (ConvNeXtV2) ONNX tagger with auto-download and robust I/O."""
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Tuple
 import logging
 import csv
 import shutil
@@ -17,7 +17,7 @@ MODEL_FILE = "model.onnx"
 TAGS_FILE = "selected_tags.csv"
 
 _session = None
-_tags = None
+_tags: List[Tuple[str, str]] | None = None
 
 
 def _ensure_files(model_dir: Path):
@@ -58,15 +58,23 @@ def _load() -> None:
         if not model_path.exists() or not tags_path.exists():
             raise FileNotFoundError("WD14 model files missing")
         _session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+        names: List[str] = []
+        cats: List[str] = []
         with tags_path.open("r", encoding="utf-8") as f:
             reader = csv.reader(f)
-            _tags = [row[0] for row in reader if row]
+            header = next(reader, None)
+            for row in reader:
+                if not row:
+                    continue
+                names.append(row[0])
+                cats.append(row[1] if len(row) > 1 else "general")
+        _tags = list(zip(names, cats))
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("WD14 load failed: %s", exc, exc_info=True)
         _session, _tags = None, None
 
 
-def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
+def extract_tags(path: Path, threshold: float = 0.25) -> Dict[str, float]:
     """Return tags for ``path`` using the WD14 ONNX model."""
     try:
         _load()
@@ -79,9 +87,14 @@ def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
         input_name = _session.get_inputs()[0].name
         y = _session.run(None, {input_name: x})[0][0]  # (num_tags,)
         out: Dict[str, float] = {}
-        for tag, score in zip(_tags, y.tolist()):
+        assert _tags is not None  # for type checkers
+        for (tag, cat), score in zip(_tags, y.tolist()):
             s = float(score)
-            if s >= threshold and not tag.startswith("rating:"):
+            if (
+                s >= threshold
+                and not tag.startswith("rating:")
+                and cat != "character"
+            ):
                 out[tag.replace("_", " ")] = s
         return out
     except Exception as exc:  # pragma: no cover - inference failures

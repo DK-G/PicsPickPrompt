@@ -24,7 +24,15 @@ ANIME_PARAMS = {
 def determine_style(ci_text: str) -> Tuple[str, Dict[str, float]]:
     """Classify style as 'anime' or 'photo' from CLIP Interrogator text."""
 
-    cues = ["35mm", "film grain", "bokeh", "studio light", "natural light", "cinematic"]
+    cues = [
+        "35mm",
+        "film grain",
+        "bokeh",
+        "studio light",
+        "natural light",
+        "cinematic",
+        "photograph",
+    ]
     text = ci_text.lower()
     if any(c in text for c in cues):
         return "photo", PHOTO_PARAMS.copy()

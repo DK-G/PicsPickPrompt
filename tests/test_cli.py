@@ -29,7 +29,7 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
 
     dd_tags = {alpha_tag(i): 1.0 for i in range(20, 40)}
     dd_tags["subject_extra_1"] = 0.9
-    monkeypatch.setattr(cli.deepdanbooru, "extract_tags", lambda p: dd_tags)
+    monkeypatch.setattr(cli.deepdanbooru, "extract_tags", lambda p: (dd_tags, None))
 
     ci_tags = {alpha_tag(i): 0.5 for i in range(40, 80)}
     ci_tags["extra_tag_1"] = 0.8
@@ -85,7 +85,7 @@ def test_cli_handles_deepdanbooru_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.wd14_onnx, "extract_tags", lambda p: wd_tags)
 
     def dd_fail(p):
-        raise RuntimeError("tensorflow_io missing")
+        return {}, "tensorflow_io missing"
 
     monkeypatch.setattr(cli.deepdanbooru, "extract_tags", dd_fail)
 
