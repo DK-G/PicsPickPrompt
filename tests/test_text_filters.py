@@ -6,7 +6,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 
-from img2prompt.utils.text_filters import clean_tokens
+from img2prompt.utils.text_filters import clean_tokens, dedupe_background
 
 
 def test_clean_tokens_filters_noise_and_meta():
@@ -79,4 +79,16 @@ def test_clean_tokens_unifies_background_tags():
     backgrounds = [t for t in out if "background" in t]
     assert backgrounds == ["white background"]
     assert "soft lighting" in out
+
+
+def test_clean_tokens_filters_single_name_tokens():
+    tokens = ["ayami", "shinkai", "soft lighting"]
+    out = clean_tokens(tokens)
+    assert out == ["soft lighting"]
+
+
+def test_dedupe_background_removes_extra_backgrounds():
+    tags = ["white background", "clean background", "soft lighting"]
+    out = dedupe_background(tags)
+    assert out == ["white background", "soft lighting"]
 
