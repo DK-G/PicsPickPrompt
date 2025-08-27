@@ -1,31 +1,36 @@
-import re
-import unicodedata
+import unicodedata, re
 
 # TitleCase 姓名検出
 NAME_TITLECASE = re.compile(r"\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b")
 NUMERIC_PAT = re.compile(r"^\d+$")
 
-# 既知のアーティスト・人名（大文字小文字を問わず判定する）
+# 既知のアーティスト・人名（大文字小文字や空白崩れを許容）
 ARTIST_TOKENS = {
     "Ayami Kojima","Rei Hiroe","Shiori Teshirogi","Tsugumi Ohba",
     "Tsukasa Dokite","Omina Tachibana","Kohei Murata",
     "Makoto Shinkai","Erika Ikuta","Harumi"
 }
-ARTIST_TOKENS_LOWER = {a.lower() for a in ARTIST_TOKENS}
+# 小文字・空白除去済みの比較セット
+_ART_LOWER_NOWS = {
+    unicodedata.normalize("NFKC", a).lower().replace(" ", "")
+    for a in ARTIST_TOKENS
+}
 
 # 線画/アニメ系ノイズ
 BAN_SUBSTR = {
-    "1girl","1boy","solo","comic","manga","cartoon",
+    "comic","manga","cartoon",
     "lineart","sketch","monochrome","grayscale","greyscale","sensitive"
 }
 
 # メタ・文章系ノイズ
 META_EXACT = {
     "artist name","twitter username","page number","general","dated",
+    "text focus","no humans","multiple girls",
 }
 BAN_PHRASES_SUBSTR = {
     "beautiful japanese girls face",
 }
+BAN_EXACT = {"standing","solo","1girl","1boy"}
 
 # 写真系ホワイトリスト（二語フレーズ）
 SAFE_TWO_WORDS = {
@@ -41,18 +46,33 @@ SAFE_TWO_WORDS = {
 def _nfkc_lower(s: str) -> str:
     return unicodedata.normalize("NFKC", s).strip(" ,.;:").lower()
 
-def _is_artist_like(raw: str) -> bool:
-    raw_nfkc = unicodedata.normalize("NFKC", raw).strip()
-    raw_lower = raw_nfkc.lower()
-    nospace = raw_lower.replace(" ", "")
+def _lev(a: str, b: str) -> int:
+    la, lb = len(a), len(b)
+    if la == 0:
+        return lb
+    if lb == 0:
+        return la
+    prev = list(range(lb + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * lb
+        for j, cb in enumerate(b, 1):
+            ins = cur[j - 1] + 1
+            delete = prev[j] + 1
+            replace = prev[j - 1] + (ca != cb)
+            cur[j] = min(ins, delete, replace)
+        prev = cur
+    return prev[lb]
 
-    if raw_lower in ARTIST_TOKENS_LOWER:
+
+def _looks_like_artist(raw: str) -> bool:
+    s = unicodedata.normalize("NFKC", raw).lower()
+    nos = s.replace(" ", "")
+    if nos in _ART_LOWER_NOWS:
         return True
-    if nospace in {a.replace(" ", "").lower() for a in ARTIST_TOKENS}:
-        return True
-    if NAME_TITLECASE.search(raw_nfkc):  # TitleCase 姓名
-        return True
-    return False
+    for tgt in _ART_LOWER_NOWS:
+        if abs(len(nos) - len(tgt)) <= 2 and _lev(nos, tgt) <= 2:
+            return True
+    return bool(NAME_TITLECASE.search(raw))
 
 def clean_tokens(tokens):
     out, seen = [], set()
@@ -68,7 +88,7 @@ def clean_tokens(tokens):
 
         if not safe:
             # ❌ 人名/作家名除去
-            if _is_artist_like(t_raw):
+            if _looks_like_artist(t_raw):
                 continue
 
             # ❌ 数値/短すぎ長すぎ
@@ -85,6 +105,8 @@ def clean_tokens(tokens):
             if t in META_EXACT:
                 continue
             if any(p in t for p in BAN_PHRASES_SUBSTR):
+                continue
+            if t in BAN_EXACT:
                 continue
 
         # ❌ 背景タグは1つだけ残す
