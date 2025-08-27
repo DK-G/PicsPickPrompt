@@ -83,15 +83,20 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
     )
     if style_preset:
         prompt_tags = apply_style(prompt_tags, style_preset)
-    prompt_tags, caption = finalize_pipeline(prompt_tags, caption=caption)
+    st, pf, prompt_tags, caption, flags = finalize_pipeline(
+        prompt_tags,
+        caption=caption,
+        wd14_tags=wd14_tags,
+        ci_picks=ci_picks,
+    )
     final_count = len(prompt_tags)
     prompt = ", ".join(prompt_tags)
 
-    style_name, params = style.determine_style(ci_raw, wd14_tags)
+    params = style.PHOTO_PARAMS if st == "photo" else style.ANIME_PARAMS
 
     print(
         f"[DEBUG] wd14_raw={len(wd14_tags_raw)} -> wd14_clean={len(wd14_tags)}; ci_raw_picks={len(ci_picks)}; "
-        f"merged_before={len(merged_before)}; after_clean={after_clean}; final={final_count}; style={style_name}"
+        f"merged_before={len(merged_before)}; after_clean={after_clean}; final={final_count}; style={st}"
     )
 
     data = {
@@ -101,7 +106,7 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
             "(low quality:1.2), (blurry:1.2), (jpeg artifacts:1.1), (duplicate:1.1), "
             "(bad anatomy:1.1), (extra fingers:1.2), (nsfw:1.3), (monochrome:1.1), (lineart:1.1)"
         ),
-        "style": style_name,
+        "style": st,
         "model_suggestion": "unspecified",
         "params": params,
         "control_suggestions": {
@@ -111,6 +116,8 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
         "meta": {
             "palette_hex": palette.extract_palette(image_path),
             "tags_debug": tags_debug,
+            "selected_profile": pf,
+            "rules_flags": flags,
         },
     }
     out_path = image_path.with_name(image_path.name + ".prompt.json")

@@ -163,7 +163,7 @@ def test_finalize_pipeline_fills_and_filters():
         "centered composition",
     ]
     cleaned = clean_tokens(sample)
-    out = finalize_pipeline(cleaned)
+    st, pf, out, _cap, _flags = finalize_pipeline(cleaned)
     assert 55 <= len(out) <= 65
     assert "ayami koj ima" not in out
     assert not ({"long hair", "short hair"} & set(out))
