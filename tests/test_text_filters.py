@@ -12,6 +12,8 @@ from img2prompt.utils.text_filters import (
     drop_contradictions,
     finalize_pipeline,
     is_bad_token,
+    unify_background,
+    sync_caption_to_prompt,
 )
 
 
@@ -111,6 +113,16 @@ def test_drop_contradictions_removes_conflicting_tags():
         "closed mouth",
         "looking at camera",
         "closed eyes",
+        "tight framing",
+        "loose framing",
+        "bust shot",
+        "rule of thirds",
+        "centered composition",
+        "soft focus",
+        "sharp focus",
+        "wide aperture",
+        "narrow aperture",
+        "shallow depth",
         "soft lighting",
     ]
     out = drop_contradictions(tags)
@@ -118,6 +130,12 @@ def test_drop_contradictions_removes_conflicting_tags():
     assert "short hair" not in out
     assert "closed mouth" not in out
     assert "closed eyes" not in out
+    assert "loose framing" not in out
+    assert "centered composition" not in out
+    assert "soft focus" not in out
+    assert "narrow aperture" not in out
+    assert "tight framing" in out
+    assert "wide aperture" in out
     assert "smile" in out
     assert "looking at camera" in out
     assert "soft lighting" in out
@@ -128,13 +146,44 @@ def test_finalize_pipeline_fills_and_filters():
         "portrait",
         "long hair",
         "short hair",
+        "soft backdrop",
+        "simple backdrop",
         "clean background",
         "ayami koj ima",
         "looking at camera",
+        "soft focus",
+        "sharp focus",
+        "wide aperture",
+        "narrow aperture",
+        "tight framing",
+        "loose framing",
+        "bust shot",
+        "rule of thirds",
+        "centered composition",
     ]
     cleaned = clean_tokens(sample)
     out = finalize_pipeline(cleaned)
     assert 55 <= len(out) <= 65
     assert "ayami koj ima" not in out
     assert not ({"long hair", "short hair"} & set(out))
+    backgrounds = [t for t in out if "background" in t or "backdrop" in t]
+    assert backgrounds == ["clean background"]
+    assert "soft focus" not in out
+    assert "wide aperture" not in out
+    assert "loose framing" not in out
+
+
+def test_unify_background_groups_synonyms():
+    tokens = ["soft backdrop", "simple backdrop", "clean background", "soft lighting"]
+    out = unify_background(tokens)
+    backgrounds = [t for t in out if "background" in t or "backdrop" in t]
+    assert backgrounds == ["clean background"]
+
+
+def test_sync_caption_to_prompt_removes_unused_objects():
+    caption = "a woman sitting at a table with a laptop and a cup"
+    tokens = ["portrait", "clean background"]
+    out = sync_caption_to_prompt(caption, tokens)
+    assert "laptop" not in out.lower()
+    assert "cup" not in out.lower()
 

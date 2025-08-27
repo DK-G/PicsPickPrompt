@@ -186,6 +186,28 @@ def dedupe_background(tags):
         out.append(t)
     return out
 
+
+BG_GROUPS = [
+    {
+        "clean background",
+        "uncluttered background",
+        "simple background",
+        "simple backdrop",
+        "soft backdrop",
+        "plain background",
+        "blank background",
+    }
+]
+
+
+def unify_background(tokens: list[str]) -> list[str]:
+    keep = set(t.lower().strip() for t in tokens)
+    for group in BG_GROUPS:
+        if keep & group:
+            keep -= group
+            keep.add("clean background")
+    return [t for t in tokens if t.lower().strip() in keep]
+
 # 画角ベースで下半身系タグを除去
 UPPER_BODY_CUES = {
     "upper body",
@@ -219,26 +241,83 @@ def drop_invisible_clothes(tokens: list[str]) -> list[str]:
 
 
 def drop_contradictions(tags: list[str]) -> list[str]:
-    """明らかな矛盾（長短や有無の衝突）を簡易に解消する。"""
-    s = set(t.strip() for t in tags)
+    s = set(t.strip().lower() for t in tags)
 
-    # 髪の長さ（既存）
+    # 髪（既存）
     hair = {"long hair", "short hair", "very short hair", "medium hair"}
     if len(s & hair) >= 2:
         s -= hair
 
-    # 目の状態：looking at camera / eye contact / open eyes があれば closed eyes を落とす
+    # 目まわり
     eye_pos = {"looking at camera", "eye contact", "open eyes"}
     if (s & eye_pos) and "closed eyes" in s:
         s.remove("closed eyes")
 
-    # 口の状態：smile と closed mouth が同居したら closed mouth を落とす
+    # 口まわり
     if "smile" in s and "closed mouth" in s:
         s.remove("closed mouth")
 
-    # 互いに排他指定したいものをここに追加可能
+    # フレーミング
+    if "tight framing" in s and "loose framing" in s:
+        hint_tight = {"bust shot", "upper body", "head-and-shoulders framing"}
+        if s & hint_tight:
+            s.discard("loose framing")
+        else:
+            s.discard("tight framing")
 
-    return [t for t in tags if t in s]
+    # 構図
+    if "rule of thirds" in s and "centered composition" in s:
+        # 迷ったら映える「rule of thirds」を優先
+        s.discard("centered composition")
+
+    # フォーカス
+    if "sharp focus" in s and "soft focus" in s:
+        s.discard("soft focus")
+
+    # 絞り
+    if "wide aperture" in s and "narrow aperture" in s:
+        if "shallow depth" in s:
+            s.discard("narrow aperture")
+        else:
+            s.discard("wide aperture")
+
+    return [t for t in tags if t.strip().lower() in s]
+
+
+CAPTION_OBJECTS = [
+    "laptop",
+    "phone",
+    "camera",
+    "microphone",
+    "book",
+    "cup",
+    "glass",
+    "bottle",
+    "pen",
+    "pencil",
+    "flower",
+    "cat",
+    "dog",
+    "bag",
+    "hat",
+    "guitar",
+    "headphones",
+]
+
+
+def sync_caption_to_prompt(caption: str, tokens: list[str]) -> str:
+    if not caption:
+        return caption
+    s = {t.lower().strip() for t in tokens}
+    text = " " + caption.strip()
+
+    for obj in CAPTION_OBJECTS:
+        if obj not in s and obj in text.lower():
+            pattern = rf"\s(?:with|holding|using|on)\b[^,\.]*\b{obj}s?\b[^,\.]*"
+            text = re.sub(pattern, "", text, flags=re.I)
+
+    text = re.sub(r"\s{2,}", " ", text).strip(" ,.;")
+    return text
 
 
 def is_bad_token(raw: str) -> bool:
@@ -336,6 +415,16 @@ SAFE_FILL = [
     "refined detail","smooth tonal range","nuanced lighting","depth cueing",
     "visual coherence","polished finish","natural rendition","clean presentation",
 ]
+CONTRA_FILL = {
+    "soft focus": {"sharp focus"},
+    "sharp focus": {"soft focus"},
+    "wide aperture": {"narrow aperture"},
+    "narrow aperture": {"wide aperture"},
+    "tight framing": {"loose framing"},
+    "loose framing": {"tight framing"},
+    "centered composition": {"rule of thirds"},
+    "rule of thirds": {"centered composition"},
+}
 
 
 MIN_TOKENS = 55
@@ -349,13 +438,15 @@ def finalize_prompt_safe(
 ) -> list[str]:
     """Fill up missing slots with safe vocabulary only."""
     seen = set(prompt_tags)
-    bg_present = any("background" in t for t in prompt_tags)
+    bg_present = any("background" in t or "backdrop" in t for t in prompt_tags)
     for w in SAFE_FILL:
         if len(prompt_tags) >= min_total:
             break
         if w in seen:
             continue
-        if bg_present and "background" in w:
+        if bg_present and ("background" in w or "backdrop" in w):
+            continue
+        if any(c in seen for c in CONTRA_FILL.get(w, set())):
             continue
         prompt_tags.append(w)
         seen.add(w)
@@ -365,6 +456,7 @@ def finalize_prompt_safe(
 def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None) -> list[str]:
     tokens = normalize_terms(tokens)
     tokens = dedupe_background(tokens)
+    tokens = unify_background(tokens)
     tokens = drop_invisible_clothes(tokens)
     tokens = drop_contradictions(tokens)
 
@@ -372,6 +464,7 @@ def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None) 
     tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
 
     tokens = finalize_prompt_safe(tokens, min_total=MIN_TOKENS, max_total=MAX_TOKENS)
-    tokens = dedupe_background(tokens)  # 埋め戻しで背景語が再増殖した場合の最終整理
+    tokens = dedupe_background(tokens)
+    tokens = unify_background(tokens)
     return tokens
 
