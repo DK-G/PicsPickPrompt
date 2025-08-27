@@ -24,8 +24,7 @@ TAGS_FILE = "selected_tags.csv"
 NUMERIC_PAT = re.compile(r"^\d+$")
 
 _session = None
-_names: List[str] | None = None
-_cats: List[str] | None = None
+_names_cats: List[tuple[str, str]] | None = None
 
 
 def _ensure_files(model_dir: Path):
@@ -45,25 +44,22 @@ def _ensure_files(model_dir: Path):
     return model_path, tags_path
 
 
-def _read_wd14_tags_csv(tags_path: Path) -> tuple[List[str], List[str]]:
-    names: List[str] = []
-    cats: List[str] = []
+def _read_wd14_tags_csv(tags_path: Path):
+    rows = []
     with open(tags_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            n = row.get("name", "").strip()
-            c = row.get("category", "general").strip().lower()
-            if not n:
-                continue
-            names.append(n)
-            cats.append(c)
-    return names, cats
+            name = (row.get("name") or row.get("tag") or "").strip()
+            cat = (row.get("category") or row.get("type") or "general").strip().lower()
+            if name:
+                rows.append((name, cat))
+    return rows  # [(name, category), ...]
 
 
 def _load() -> None:
     """Lazily load ONNX session and tag list."""
-    global _session, _names, _cats
-    if _session is not None and _names is not None and _cats is not None:
+    global _session, _names_cats
+    if _session is not None and _names_cats is not None:
         return
     try:
         if ort is None:
@@ -84,35 +80,55 @@ def _load() -> None:
         if not model_path.exists() or not tags_path.exists():
             raise FileNotFoundError("WD14 model files missing")
         _session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
-        _names, _cats = _read_wd14_tags_csv(tags_path)
+        _names_cats = _read_wd14_tags_csv(tags_path)
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("WD14 load failed: %s", exc, exc_info=True)
-        _session, _names, _cats = None, None, None
+        _session, _names_cats = None, None
 
 
-def _postprocess_wd14(scores, threshold: float = 0.25) -> Dict[str, float]:
-    assert _names is not None and _cats is not None
-    out: Dict[str, float] = {}
-    for tag, cat, score in zip(_names, _cats, scores.tolist()):
-        s = float(score)
-        if s < threshold:
-            continue
+def _postprocess_wd14(scores, names_cats, threshold: float = 0.23, topk: int = 60) -> Dict[str, float]:
+    # 1) threshold filter and basic cleaning
+    items = []
+    for (tag, cat), sc in zip(names_cats, scores.tolist()):
+        s = float(sc)
         if tag.startswith("rating:"):
             continue
         if cat == "character":
             continue
-        tag_norm = tag.replace("_", " ").strip().lower()
-        if NUMERIC_PAT.match(tag_norm):
+        t = tag.replace("_", " ").strip().lower()
+        if NUMERIC_PAT.match(t):
             continue
-        out[tag_norm] = s
-    return dict(sorted(out.items(), key=lambda kv: kv[1], reverse=True)[:50])
+        items.append((t, cat, s))
+
+    # 2) sort by score desc
+    items.sort(key=lambda x: x[2], reverse=True)
+
+    # 3) category priority for top-K
+    priority = {"general": 0, "clothing": 1, "selfie": 2, "accessories": 3, "other": 9}
+    items.sort(key=lambda x: (priority.get(x[1], 5), -x[2]))
+
+    # 4) select top-K respecting threshold
+    out: Dict[str, float] = {}
+    for t, c, s in items[:topk]:
+        if s >= threshold:
+            out[t] = s
+
+    # ensure at least 30 entries
+    if len(out) < 30:
+        for t, c, s in items[:topk]:
+            if t not in out:
+                out[t] = s
+                if len(out) >= 30:
+                    break
+
+    return out
 
 
-def extract_tags(path: Path, threshold: float = 0.25) -> Dict[str, float]:
+def extract_tags(path: Path, threshold: float = 0.23, topk: int = 60) -> Dict[str, float]:
     """Return tags for ``path`` using the WD14 ONNX model."""
     try:
         _load()
-        if _session is None or _names is None or _cats is None:
+        if _session is None or _names_cats is None:
             raise RuntimeError("WD14 unavailable")
 
         img = Image.open(path).convert("RGB").resize((448, 448), Image.BICUBIC)
@@ -120,7 +136,7 @@ def extract_tags(path: Path, threshold: float = 0.25) -> Dict[str, float]:
         x = x[np.newaxis, ...]  # (1,448,448,3)
         input_name = _session.get_inputs()[0].name
         y = _session.run(None, {input_name: x})[0][0]  # (num_tags,)
-        return _postprocess_wd14(y, threshold)
+        return _postprocess_wd14(y, _names_cats, threshold, topk)
     except Exception as exc:  # pragma: no cover - inference failures
         logger.warning("WD14 inference failed: %s", exc, exc_info=True)
         return {}

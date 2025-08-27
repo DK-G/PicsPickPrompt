@@ -113,64 +113,34 @@ def bucketize(tags: Dict[str, float]) -> Dict[str, List[str]]:
 
 
 FLOOR = [
-    "portrait",
-    "upper body",
-    "looking at camera",
-    "soft lighting",
-    "warm tones",
-    "sharp focus",
-    "depth of field",
-    "wooden interior",
-    "window light",
-    "cozy atmosphere",
-    "warm highlights",
-    "gentle shadow",
+  "portrait","upper body","looking at camera","soft lighting","warm tones",
+  "sharp focus","depth of field","wooden interior","window light","cozy atmosphere",
+  "warm highlights","gentle shadow","natural skin tones","ambient light"
 ]
-
 FILLER_BANK = [
-    "natural skin tones",
-    "subtle shadows",
-    "ambient light",
-    "clean background",
-    "balanced composition",
-    "eye level view",
-    "soft contrast",
-    "realistic texture",
-    "warm color palette",
-    "fine details",
-    "cinematic feel",
-    "subtle bokeh",
+  "balanced composition","eye level view","soft contrast","realistic texture",
+  "warm color palette","fine details","cinematic feel","subtle bokeh",
+  "clean background","subtle shadows","smooth gradients","natural highlights",
+  "muted colors","shallow depth","soft focus"
 ]
 
-
-def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str]) -> List[str]:
-    """Return a tag list of between 50 and 70 entries without looping."""
-
-    nounish = [
-        p.strip()
-        for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
-        if 1 <= len(p.split()) <= 4
-    ]
+def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str], min_total: int = 50, max_total: int = 70) -> List[str]:
+    nounish = [p.strip() for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
+               if 1 <= len(p.split()) <= 4]
 
     merged: List[str] = []
 
     def add_many(src: List[str], limit: int | None = None) -> None:
-        nonlocal merged
         for w in src:
-            w = w.strip(", ").lower()
+            w = (w or "").strip(" ,").lower()
             if 2 <= len(w) <= 40 and w not in merged:
                 merged.append(w)
                 if limit and len(merged) >= limit:
                     break
 
     add_many(tags)
-    if len(merged) < 50:
-        add_many(nounish, limit=50)
-    if len(merged) < 50:
-        add_many(ci_picks or [], limit=50)
-    if len(merged) < 50:
-        add_many(FLOOR, limit=50)
-    if len(merged) < 50:
-        add_many(FILLER_BANK, limit=50)
-
-    return merged[:70]
+    if len(merged) < min_total: add_many(nounish, limit=min_total)
+    if len(merged) < min_total: add_many(ci_picks or [], limit=min_total)
+    if len(merged) < min_total: add_many(FLOOR, limit=min_total)
+    if len(merged) < min_total: add_many(FILLER_BANK, limit=min_total)
+    return merged[:max_total]
