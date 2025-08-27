@@ -15,7 +15,12 @@ def _load() -> None:
     global _model, _tags
     if _model is not None and _tags is not None:
         return
-    import deepdanbooru as dd  # type: ignore
+    try:
+        import deepdanbooru as dd  # type: ignore
+    except ImportError:
+        logger.info("[deepdanbooru] disabled")
+        _model = _tags = None
+        return
 
     project_path = dd.project.default_project_path()
     _model = dd.project.load_model_from_project(project_path)
@@ -38,7 +43,7 @@ def extract_tags(path: Path, threshold: float = 0.35) -> Tuple[Dict[str, float],
         return {}, msg
 
     if _model is None or _tags is None:
-        return {}, "DeepDanbooru model unavailable"
+        return {}, None
 
     try:
         from PIL import Image

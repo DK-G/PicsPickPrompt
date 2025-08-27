@@ -104,12 +104,22 @@ def test_is_bad_token_handles_whitelist_and_bans():
 
 
 def test_drop_contradictions_removes_conflicting_tags():
-    tags = ["long hair", "short hair", "soft lighting", "open mouth", "closed mouth"]
+    tags = [
+        "long hair",
+        "short hair",
+        "smile",
+        "closed mouth",
+        "looking at camera",
+        "closed eyes",
+        "soft lighting",
+    ]
     out = drop_contradictions(tags)
     assert "long hair" not in out
     assert "short hair" not in out
-    assert "open mouth" not in out
     assert "closed mouth" not in out
+    assert "closed eyes" not in out
+    assert "smile" in out
+    assert "looking at camera" in out
     assert "soft lighting" in out
 
 
