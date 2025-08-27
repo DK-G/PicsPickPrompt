@@ -2,51 +2,81 @@ import re, unicodedata
 
 NUMERIC_PAT = re.compile(r"^\d+$")
 
-# --- 1) 人名判定：小文字・空白崩れ・軽微typoのみ（過剰マッチ防止のため距離≤1） ---
-ARTIST_TOKENS = {
-    "Ayami Kojima","Rei Hiroe","Shiori Teshirogi","Tsugumi Ohba",
-    "Tsukasa Dokite","Omina Tachibana","Kohei Murata",
-    "Makoto Shinkai","Erika Ikuta","Harumi",
-    # 単語だけで来るケースも弾く
-    "Ayami","Kojima","Ohba","Teshirogi","Hiroe","Dokite","Tachibana","Ikuta","Shinkai",
+# --- 1) 人名判定：崩れ・typo・姓/名単体も検出 ---
+ARTIST_FULL = {
+    "ayami kojima",
+    "rei hiroe",
+    "shiori teshirogi",
+    "tsugumi ohba",
+    "tsukasa dokite",
+    "omina tachibana",
+    "kohei murata",
+    "makoto shinkai",
+    "erika ikuta",
+    "harumi",
 }
-_ART_NOWS = {unicodedata.normalize("NFKC", a).lower().replace(" ", "") for a in ARTIST_TOKENS}
-
-def _lev1(a: str, b: str) -> bool:
-    # レーベンシュタイン距離 ≤1（高速・過剰除外を避ける）
-    if a == b:
-        return True
-    if abs(len(a) - len(b)) > 1:
-        return False
-    if len(a) == len(b):
-        diff = [(x, y) for x, y in zip(a, b) if x != y]
-        if len(diff) == 1:
-            return True  # 置換1回
-        if len(diff) == 2 and diff[0][0] == diff[1][1] and diff[0][1] == diff[1][0]:
-            return True  # 2文字の入れ替え
-        return False
-    # 長さ差1の場合: 挿入/削除1回
-    if len(a) < len(b):
-        a, b = b, a
-    i = j = edits = 0
-    while i < len(a) and j < len(b):
-        if a[i] == b[j]:
-            i += 1; j += 1
-        else:
-            edits += 1
-            if edits > 1:
-                return False
-            i += 1  # aが長いので削除
-    return True
+ARTIST_LAST = {
+    "kojima",
+    "hiroe",
+    "teshirogi",
+    "ohba",
+    "dokite",
+    "tachibana",
+    "murata",
+    "shinkai",
+    "ikuta",
+}
+ARTIST_FIRST = {
+    "ayami",
+    "rei",
+    "shiori",
+    "tsugumi",
+    "tsukasa",
+    "omina",
+    "kohei",
+    "makoto",
+    "erika",
+    "harumi",
+}
 
 def _looks_like_artist(raw: str) -> bool:
-    s = unicodedata.normalize("NFKC", raw).lower()
+    s = _nfkc_lower(raw)
     nos = s.replace(" ", "")
-    if nos in _ART_NOWS:
+    # 1) 完全一致 / 空白除去一致
+    if s in ARTIST_FULL or nos in {a.replace(" ", "") for a in ARTIST_FULL}:
         return True
-    # 軽微typoのみ許容（距離≤1）
-    for tgt in _ART_NOWS:
-        if _lev1(nos, tgt):
+    # 2) 語単位で姓/名が出たら“人名っぽい”
+    words = set(s.split())
+    if (words & ARTIST_LAST) or (words & ARTIST_FIRST):
+        return True
+
+    # 3) 軽微typo（距離<=2）でフルネームに近い
+    def _lev2(a: str, b: str) -> int:
+        if a == b:
+            return 0
+        if abs(len(a) - len(b)) > 2:
+            return 3
+        i = j = edits = 0
+        while i < len(a) and j < len(b):
+            if a[i] == b[j]:
+                i += 1
+                j += 1
+            else:
+                edits += 1
+                if edits > 2:
+                    return edits
+                if len(a) == len(b):
+                    i += 1
+                    j += 1
+                elif len(a) > len(b):
+                    i += 1
+                else:
+                    j += 1
+        edits += (len(a) - i) + (len(b) - j)
+        return edits
+
+    for full in ARTIST_FULL:
+        if _lev2(nos, full.replace(" ", "")) <= 2:
             return True
     return False
 
