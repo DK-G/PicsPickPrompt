@@ -38,3 +38,20 @@ def test_ensure_50_70_respects_allow_and_background():
     assert "1girl" not in out
     backgrounds = [t for t in out if "background" in t]
     assert backgrounds == ["white background"]
+
+
+def test_is_bad_token_meta_exact_and_finalize():
+    from img2prompt.utils.text_filters import (
+        is_bad_token,
+        finalize_prompt_safe,
+        SAFE_FILL,
+    )
+
+    for w in ["text focus", "no humans", "multiple girls"]:
+        assert is_bad_token(w)
+
+    # ensure finalize fills with safe tokens only
+    base = ["portrait"]
+    out = finalize_prompt_safe(base.copy(), min_total=5, max_total=10)
+    assert len(out) >= 5
+    assert all(t in SAFE_FILL or t == "portrait" for t in out)

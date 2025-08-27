@@ -8,6 +8,8 @@ from .utils.text_filters import (
     clean_tokens,
     is_bad_token,
     normalize_terms,
+    dedupe_background,
+    finalize_prompt_safe,
 )
 from .options.style_presets import apply_style, STYLE_PRESETS
 from .export import writer
@@ -82,6 +84,8 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
         allow=lambda w: not is_bad_token(w),
     )
     prompt_tags = normalize_terms(prompt_tags)
+    prompt_tags = dedupe_background(prompt_tags)
+    prompt_tags = finalize_prompt_safe(prompt_tags, min_total=55, max_total=70)
     final_count = len(prompt_tags)
     if style_preset:
         prompt_tags = apply_style(prompt_tags, style_preset)
