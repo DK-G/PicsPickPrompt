@@ -6,10 +6,10 @@ BAD_TOKENS = {"ayami", "kojima", "tsugumi", "ohba", "murata", "kohei"}
 
 
 def clean_tokens(tokens):
-    out = []
+    out, seen = [], set()
     for t in tokens:
-        t = t.strip(", ").lower()
-        if not t or len(t) < 2 or len(t) > 40:
+        t = (t or "").strip(", ").lower()
+        if not (2 <= len(t) <= 40):
             continue
         if NAME_PAT.search(t):
             continue
@@ -17,12 +17,8 @@ def clean_tokens(tokens):
             continue
         if any(bt in t for bt in BAD_TOKENS):
             continue
-        out.append(t)
-    seen = set()
-    dedup = []
-    for t in out:
         if t not in seen:
             seen.add(t)
-            dedup.append(t)
-    return dedup
+            out.append(t)
+    return out
 

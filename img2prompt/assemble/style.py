@@ -21,8 +21,13 @@ ANIME_PARAMS = {
 }
 
 
-def determine_style(ci_text: str) -> Tuple[str, Dict[str, float]]:
-    """Classify style as 'anime' or 'photo' from CLIP Interrogator text."""
+def determine_style(ci_raw: str, wd14_tags: Dict[str, float]) -> Tuple[str, Dict[str, float]]:
+    """Classify style as 'anime' or 'photo'.
+
+    Preference is given to photographic style when the CLIP Interrogator text
+    contains photo cues. If those cues are absent, WD14 tags are inspected and
+    the absence of anime/comic indicators also results in a photo style.
+    """
 
     cues = [
         "35mm",
@@ -33,7 +38,13 @@ def determine_style(ci_text: str) -> Tuple[str, Dict[str, float]]:
         "cinematic",
         "photograph",
     ]
-    text = ci_text.lower()
-    if any(c in text for c in cues):
-        return "photo", PHOTO_PARAMS.copy()
-    return "anime", ANIME_PARAMS.copy()
+    ci_low = (ci_raw or "").lower()
+    photo = any(c in ci_low for c in cues)
+
+    if not photo:
+        wd14_join = " ".join(wd14_tags.keys())
+        photo = not any(k in wd14_join for k in ["anime", "manga", "comic", "cartoon"])
+
+    style = "photo" if photo else "anime"
+    params = PHOTO_PARAMS.copy() if style == "photo" else ANIME_PARAMS.copy()
+    return style, params
