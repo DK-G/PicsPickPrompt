@@ -271,6 +271,8 @@ def drop_contradictions(tags: list[str]) -> list[str]:
     if "rule of thirds" in s and "centered composition" in s:
         # 迷ったら映える「rule of thirds」を優先
         s.discard("centered composition")
+    if "balanced composition" in s and "centered composition" in s:
+        s.discard("centered composition")
 
     # フォーカス
     if "sharp focus" in s and "soft focus" in s:
@@ -286,6 +288,16 @@ def drop_contradictions(tags: list[str]) -> list[str]:
     return [t for t in tags if t.strip().lower() in s]
 
 
+def adjust_framing_for_cues(tokens: list[str]) -> list[str]:
+    s = {t.lower().strip() for t in tokens}
+    if s & UPPER_BODY_CUES and "loose framing" in s and "tight framing" not in s:
+        return [
+            "tight framing" if t.lower().strip() == "loose framing" else t
+            for t in tokens
+        ]
+    return tokens
+
+
 REDUNDANT_GROUPS = [
     {"warm tones", "warm color palette", "muted colors", "neutral palette"},
     {"soft contrast", "low contrast look"},
@@ -295,7 +307,13 @@ REDUNDANT_GROUPS = [
     {"fine details", "surface detail", "refined detail"},
     {"looking at camera", "eye contact"},
     {"gentle shadow", "subtle shadows", "soft shadows"},
-    {"photographic realism", "life-like rendering", "natural rendition", "clean rendition"},
+    {"photographic realism", "life-like rendering"},
+]
+
+# 追加の冗長グループ
+REDUNDANT_GROUPS += [
+    {"gentle tonality", "soft tonality"},
+    {"realistic texture", "natural rendition", "clean rendition"},
 ]
 
 PREFER_ORDER = {
@@ -309,6 +327,13 @@ PREFER_ORDER = {
     "gentle shadow": 0,
     "photographic realism": 0,
 }
+
+PREFER_ORDER.update(
+    {
+        "gentle tonality": 0,
+        "realistic texture": 0,
+    }
+)
 
 # すべてのグループを索引化
 _ALL_GROUPS = [set(g) for g in REDUNDANT_GROUPS]
@@ -544,6 +569,7 @@ def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, 
     tokens = unify_background(tokens)
     tokens = drop_invisible_clothes(tokens)
     tokens = drop_contradictions(tokens)
+    tokens = adjust_framing_for_cues(tokens)
     tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
     tokens = finalize_prompt_safe(tokens, min_tokens=55, max_tokens=65, context=context)
     tokens = compress_redundant(tokens)
