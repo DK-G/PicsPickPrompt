@@ -2,6 +2,7 @@ import re, unicodedata
 import difflib
 import random
 import hashlib
+from typing import Iterable, Sequence
 
 NUMERIC_PAT = re.compile(r"^\d+$")
 
@@ -543,6 +544,138 @@ SAFE_FILL = [
     "refined detail","smooth tonal range","nuanced lighting","depth cueing",
     "visual coherence","polished finish","natural rendition","clean presentation",
 ]
+
+
+def merge_unique(*lists: Sequence[str]) -> list[str]:
+    out, seen = [], set()
+    for ls in lists:
+        for w in ls:
+            if w not in seen:
+                out.append(w)
+                seen.add(w)
+    return out
+
+
+# ---- SAFE_FILL pools per style/profile ----
+SAFE_FILL_PHOTO_SINGLE_UPPER = SAFE_FILL
+
+SAFE_FILL_PHOTO_FULLBODY = merge_unique(SAFE_FILL, [
+    "full body",
+    "full-length framing",
+    "standing pose",
+    "natural stance",
+    "balanced posture",
+    "head-to-toe composition",
+    "silhouette clarity",
+    "garment detail",
+    "fabric texture",
+    "shoe detail",
+    "body proportion balance",
+    "pose stability",
+])
+
+SAFE_FILL_PHOTO_GROUP_UPPER = merge_unique(SAFE_FILL, [
+    "group portrait",
+    "subject spacing",
+    "staggered heights",
+    "layered arrangement",
+    "even illumination across subjects",
+    "consistent white balance",
+    "minimal overlap",
+    "depth separation for subjects",
+])
+
+SAFE_FILL_PHOTO_GROUP_FULL = merge_unique(SAFE_FILL_PHOTO_FULLBODY, [
+    "group portrait",
+    "subject spacing",
+    "staggered heights",
+    "layered arrangement",
+    "even illumination across subjects",
+    "minimal overlap",
+    "depth separation for subjects",
+])
+
+SAFE_FILL_ANIME_SINGLE_UPPER = [
+    # drawing & lines
+    "clean line art",
+    "consistent outline",
+    "crisp edges",
+    "line weight control",
+    "inked contours",
+    # shading & color
+    "cel shading",
+    "flat shading",
+    "soft gradients",
+    "minimal banding",
+    "simple color palette",
+    "color harmony",
+    "anime proportions",
+    "face lighting",
+    "hair highlights",
+    "eye highlights",
+    "expressive eyes",
+    # framing & layout
+    "facing viewer",
+    "character silhouette",
+    "pose clarity",
+    "panel-friendly framing",
+    "readable shapes",
+    # background
+    "clean backdrop",
+    "simple backdrop",
+    "uncluttered backdrop",
+    "negative space",
+    # finish
+    "smooth fill",
+    "uniform tones",
+    "color separation",
+    "edge cleanliness",
+    "SFX-ready space",
+    "screen-tone friendly",
+    "print-safe contrast",
+    "soft glow hint",
+    "subtle rim light",
+    "gentle vignette",
+    # stability extras
+    "uniform line density",
+    "flat color blocks",
+    "selective detailing",
+    "shape language clarity",
+    "visual coherence",
+    "design consistency",
+    "appeal-focused rendering",
+]
+
+SAFE_FILL_ANIME_FULLBODY = merge_unique(SAFE_FILL_ANIME_SINGLE_UPPER, [
+    "full body",
+    "full-length framing",
+    "standing pose",
+    "natural stance",
+    "silhouette readability",
+    "garment folds",
+    "fabric rendering",
+    "shoe design",
+    "proportion consistency",
+    "gesture clarity",
+])
+
+SAFE_FILL_ANIME_GROUP_UPPER = merge_unique(SAFE_FILL_ANIME_SINGLE_UPPER, [
+    "group composition",
+    "subject spacing",
+    "staggered heights",
+    "overlap control",
+    "face readability",
+    "consistent outlines across subjects",
+])
+
+SAFE_FILL_ANIME_GROUP_FULL = merge_unique(SAFE_FILL_ANIME_FULLBODY, [
+    "group composition",
+    "subject spacing",
+    "staggered heights",
+    "overlap control",
+    "silhouette separation",
+    "ensemble balance",
+])
 CONTRA_FILL = {
     "soft focus": {"sharp focus"},
     "sharp focus": {"soft focus"},
@@ -553,13 +686,6 @@ CONTRA_FILL = {
     "centered composition": {"rule of thirds"},
     "rule of thirds": {"centered composition"},
 }
-
-
-def _seed_from_context(context=None) -> int:
-    if not context:
-        return 123456789
-    h = hashlib.sha1(("||".join(map(str, context))).encode("utf-8")).hexdigest()
-    return int(h[:8], 16)
 
 
 def finalize_prompt_safe(
@@ -609,22 +735,373 @@ def finalize_prompt_safe(
     return out
 
 
-def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, context=None, caption: str | None = None):
+def finalize_pipeline(
+    tokens: list[str],
+    caption: str | None = None,
+    wd14_tags: Iterable[str] | None = None,
+    ci_picks: Sequence[str] | None = None,
+    style: str = "auto",
+    profile: str = "auto",
+    blocked_names: set[str] | None = None,
+):
     tokens = normalize_terms(tokens)
     tokens = dedupe_background(tokens)
-    tokens = unify_background(tokens)
-    tokens = drop_invisible_clothes(tokens)
-    tokens = drop_contradictions(tokens)
-    tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
+    st, pf, tokens, caption, flags = run_pipeline(
+        tokens=tokens,
+        caption=caption,
+        wd14_tags=wd14_tags,
+        ci_picks=ci_picks,
+        style=style,
+        profile=profile,
+        blocked_names=blocked_names,
+    )
+    return st, pf, tokens, caption, flags
 
-    tokens = finalize_prompt_safe(tokens, min_tokens=55, max_tokens=65, context=context)
-    tokens = drop_contradictions(tokens)
-    tokens = compress_redundant(tokens)
-    tokens = dedupe_background(tokens)
-    tokens = unify_background(tokens)
 
-    if caption is not None:
-        synced = sync_caption_to_prompt(caption, tokens)
-        return tokens, synced
-    return tokens
+# =========================
+# Style / Profile Router
+# =========================
+
+ANIME_HINTS = {
+    "anime",
+    "manga",
+    "2d",
+    "illustration",
+    "lineart",
+    "cel shading",
+    "flat shading",
+    "chibi",
+    "cartoon",
+    "toon",
+    "koukyou shihen",
+    "waifu",
+    "vtuber",
+    "pixiv",
+    "doujin",
+}
+
+
+def choose_style(wd14_tags: Iterable[str], caption: str, prefer: str = "auto") -> str:
+    st = (prefer or "auto").lower()
+    if st in ("photo", "anime"):
+        return st
+    s = {t.lower().strip() for t in (wd14_tags or [])}
+    cap = (caption or "").lower()
+    if (s & ANIME_HINTS) or any(k in cap for k in ANIME_HINTS):
+        return "anime"
+    return "photo"
+
+
+def select_profile(wd14_tags: Iterable[str], caption: str) -> str:
+    s = {t.lower().strip() for t in (wd14_tags or [])}
+    cap = (caption or "").lower()
+    multi = any(
+        k in s or k in cap
+        for k in [
+            "2girls",
+            "2boys",
+            "3girls",
+            "3boys",
+            "group",
+            "crowd",
+            "several people",
+            "a group of",
+            "multiple people",
+        ]
+    )
+    full = any(
+        k in s or k in cap
+        for k in [
+            "full body",
+            "full-body",
+            "full length",
+            "full-length",
+            "head to toe",
+            "head-to-toe",
+            "standing full length",
+        ]
+    )
+    if not multi and not full:
+        return "single_upper"
+    if not multi and full:
+        return "single_fullbody"
+    if multi and not full:
+        return "group_upper"
+    return "group_fullbody"
+
+
+PROFILES = {
+    "single_upper": {
+        "allow_lower_garments": False,
+        "unify_background": True,
+        "framing_k": 2,
+        "enforce_eye_contact": True,
+        "hair_rules": "strict",
+    },
+    "single_fullbody": {
+        "allow_lower_garments": True,
+        "unify_background": True,
+        "framing_k": 2,
+        "enforce_eye_contact": True,
+        "hair_rules": "lenient",
+    },
+    "group_upper": {
+        "allow_lower_garments": False,
+        "unify_background": False,
+        "framing_k": 1,
+        "enforce_eye_contact": False,
+        "hair_rules": "neutral",
+    },
+    "group_fullbody": {
+        "allow_lower_garments": True,
+        "unify_background": False,
+        "framing_k": 1,
+        "enforce_eye_contact": False,
+        "hair_rules": "neutral",
+    },
+}
+
+
+def unify_background_style(tokens: list[str], style: str, enable: bool) -> list[str]:
+    if not enable:
+        return tokens
+    tgt = "clean backdrop" if style == "anime" else "clean background"
+    groups = [
+        {
+            "clean background",
+            "simple background",
+            "uncluttered background",
+            "plain background",
+            "soft backdrop",
+            "simple backdrop",
+            "clean backdrop",
+        },
+    ]
+    keep = set(t.lower().strip() for t in tokens)
+    for g in groups:
+        if keep & g:
+            keep -= g
+            keep.add(tgt)
+    return [t for t in tokens if t.lower().strip() in keep]
+
+
+def drop_contradictions_style(tags: list[str], style: str = "photo") -> list[str]:
+    s = set(t.strip().lower() for t in tags)
+
+    hair = {"long hair", "short hair", "very short hair", "medium hair"}
+    if len(s & hair) >= 2:
+        s -= hair
+
+    eye_pos = {"looking at camera", "eye contact", "open eyes", "facing viewer"}
+    if (s & eye_pos) and "closed eyes" in s:
+        s.remove("closed eyes")
+
+    if "smile" in s and "closed mouth" in s:
+        s.remove("closed mouth")
+
+    if "tight framing" in s and "loose framing" in s:
+        s.discard("loose framing")
+    if "rule of thirds" in s and "centered composition" in s:
+        s.discard("centered composition")
+    if "balanced composition" in s and "centered composition" in s:
+        s.discard("centered composition")
+    if "loose framing" in s and (s & UPPER_BODY_CUES):
+        s.discard("loose framing")
+
+    if style == "photo":
+        if "sharp focus" in s and "soft focus" in s:
+            s.discard("soft focus")
+        if "wide aperture" in s and "narrow aperture" in s:
+            if "shallow depth" in s:
+                s.discard("narrow aperture")
+            else:
+                s.discard("wide aperture")
+
+    if style == "anime":
+        if "cel shading" in s and "painterly shading" in s:
+            s.discard("painterly shading")
+        if "flat shading" in s and "realistic texture" in s:
+            s.discard("realistic texture")
+        if "thick outline" in s and "no outline" in s:
+            s.discard("no outline")
+        for ban in (
+            "bokeh",
+            "depth of field",
+            "wide aperture",
+            "narrow aperture",
+            "photographic realism",
+        ):
+            if ban in s:
+                s.discard(ban)
+
+    return [t for t in tags if t.strip().lower() in s]
+
+
+FRAMING_ORDER = [
+    "portrait",
+    "upper body",
+    "head-and-shoulders framing",
+    "bust shot",
+    "three-quarter view",
+    "full body",
+    "full-length framing",
+]
+FRAMING_SET = {t.lower() for t in FRAMING_ORDER}
+
+
+def compress_framing(tokens: list[str], k: int = 2) -> list[str]:
+    keep, others, seen = [], [], set()
+    for t in tokens:
+        tl = t.strip().lower()
+        if tl in FRAMING_SET and tl not in seen:
+            keep.append(tl)
+            seen.add(tl)
+        else:
+            others.append(t)
+    keep = sorted(keep, key=lambda x: FRAMING_ORDER.index(x))[:k]
+    return [t for t in others] + keep
+
+
+def _seed_from_context(context: Sequence[str] | None = None) -> int:
+    if not context:
+        return 123456789
+    h = hashlib.sha1(("||".join(map(str, context))).encode("utf-8")).hexdigest()
+    return int(h[:8], 16)
+
+
+def finalize_prompt_safe_ext(
+    tokens: list[str],
+    min_tokens: int = 55,
+    max_tokens: int = 65,
+    context: Sequence[str] | None = None,
+    safe_pool: Sequence[str] | None = None,
+) -> list[str]:
+    out = compress_redundant(tokens[:])
+    pool = list(safe_pool or SAFE_FILL)
+    if len(out) < min_tokens and pool:
+        rnd = random.Random(_seed_from_context(context or out))
+        rnd.shuffle(pool)
+        cur = set(out)
+        for w in pool:
+            if len(out) >= min_tokens:
+                break
+            if w in cur:
+                continue
+            if any(c in cur for c in CONTRA_FILL.get(w, set())):
+                continue
+            out.append(w)
+            cur.add(w)
+    out = compress_redundant(out)
+    if len(out) < min_tokens and pool:
+        for w in pool:
+            if len(out) >= min_tokens:
+                break
+            if w in out:
+                continue
+            if any(c in out for c in CONTRA_FILL.get(w, set())):
+                continue
+            out.append(w)
+    return out[:max_tokens]
+
+
+def _choose_safe_pool(style: str, profile: str) -> list[str]:
+    if style == "photo":
+        if profile == "single_upper":
+            return SAFE_FILL_PHOTO_SINGLE_UPPER
+        if profile == "single_fullbody":
+            return SAFE_FILL_PHOTO_FULLBODY
+        if profile == "group_upper":
+            return SAFE_FILL_PHOTO_GROUP_UPPER
+        if profile == "group_fullbody":
+            return SAFE_FILL_PHOTO_GROUP_FULL
+    else:
+        if profile == "single_upper":
+            return SAFE_FILL_ANIME_SINGLE_UPPER
+        if profile == "single_fullbody":
+            return SAFE_FILL_ANIME_FULLBODY
+        if profile == "group_upper":
+            return SAFE_FILL_ANIME_GROUP_UPPER
+        if profile == "group_fullbody":
+            return SAFE_FILL_ANIME_GROUP_FULL
+    return SAFE_FILL
+
+
+def run_pipeline(
+    tokens: list[str],
+    caption: str | None,
+    wd14_tags: Iterable[str] | None,
+    ci_picks: Sequence[str] | None = None,
+    style: str = "auto",
+    profile: str = "auto",
+    blocked_names: set[str] | None = None,
+):
+    st = choose_style(wd14_tags or [], caption or "", prefer=style)
+    pf = profile if profile in PROFILES else select_profile(wd14_tags or [], caption or "")
+    cfg = PROFILES[pf]
+    pool = _choose_safe_pool(st, pf)
+
+    t = tokens[:]
+
+    t = unify_background_style(t, st, enable=bool(cfg["unify_background"]))
+    if st == "photo" and not cfg["allow_lower_garments"]:
+        t = drop_invisible_clothes(t)
+    t = drop_contradictions_style(t, style=st)
+    t = purge_artist_fragments(t, blocked_fullnames=blocked_names)
+    t = compress_framing(t, k=int(cfg["framing_k"]))
+
+    t = finalize_prompt_safe_ext(
+        t,
+        min_tokens=55,
+        max_tokens=65,
+        context=ci_picks or t,
+        safe_pool=pool,
+    )
+
+    t = drop_contradictions_style(t, style=st)
+    t = compress_redundant(t)
+    t = unify_background_style(t, st, enable=bool(cfg["unify_background"]))
+    if len(t) < 55:
+        t = finalize_prompt_safe_ext(
+            t,
+            min_tokens=55,
+            max_tokens=65,
+            context=ci_picks or t,
+            safe_pool=pool,
+        )
+        t = unify_background_style(t, st, enable=bool(cfg["unify_background"]))
+        if len(t) < 55:
+            t = finalize_prompt_safe_ext(
+                t,
+                min_tokens=55,
+                max_tokens=65,
+                context=ci_picks or t,
+                safe_pool=pool,
+            )
+    t = dedupe_background(t)
+    if len(t) < 55:
+        t = finalize_prompt_safe_ext(
+            t,
+            min_tokens=55,
+            max_tokens=65,
+            context=ci_picks or t,
+            safe_pool=pool,
+        )
+        t = unify_background_style(t, st, enable=bool(cfg["unify_background"]))
+        t = dedupe_background(t)
+
+    try:
+        new_cap = sync_caption_to_prompt(caption or "", t)
+    except NameError:
+        new_cap = caption or ""
+
+    flags = {
+        "style": st,
+        "profile": pf,
+        "unify_bg": bool(cfg["unify_background"]),
+        "allow_lower_garments": bool(cfg["allow_lower_garments"]),
+        "framing_k": int(cfg["framing_k"]),
+        "hair": cfg["hair_rules"],
+    }
+
+    return st, pf, t, new_cap, flags
 
