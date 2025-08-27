@@ -84,10 +84,10 @@ def test_clean_tokens_unifies_background_tags():
     assert "soft lighting" in out
 
 
-def test_clean_tokens_allows_single_name_tokens():
+def test_clean_tokens_strips_single_name_tokens():
     tokens = ["ayami", "shinkai", "soft lighting"]
     out = clean_tokens(tokens)
-    assert out == ["ayami", "shinkai", "soft lighting"]
+    assert out == ["soft lighting"]
 
 
 def test_dedupe_background_removes_extra_backgrounds():

@@ -70,6 +70,10 @@ def _looks_like_artist(raw: str) -> bool:
             max(_similar(l, x) for x in ARTIST_LAST) >= 0.90):
             return True
 
+    # 追加: 単語単体でも既知の名簿にあれば弾く
+    if (s in ARTIST_FIRST) or (s in ARTIST_LAST):
+        return True
+
     return False
 
 # --- 2) 写真語ホワイトリスト（先に通す） ---
@@ -131,6 +135,44 @@ def clean_tokens(tokens):
         if t not in seen:
             seen.add(t)
             out.append(t)
+    return out
+
+# --- 新規: 人名断片のパージ -----------------------------------------------
+def purge_artist_fragments(tokens: list[str],
+                           blocked_fullnames: set[str] | None = None,
+                           first_names: set[str] | None = None,
+                           last_names: set[str] | None = None) -> list[str]:
+    """
+    既に 'blocked_in_ensure' 相当で弾かれた複合名の
+    構成要素（例: 'ayami kojima' -> {'ayami','kojima'}）や
+    既知の FIRST/LAST 名簿の単語を、単体出現していたら削除する。
+    """
+    blocked_fullnames = blocked_fullnames or set()
+    first_names = first_names or (ARTIST_FIRST if 'ARTIST_FIRST' in globals() else set())
+    last_names  = last_names  or (ARTIST_LAST  if 'ARTIST_LAST'  in globals() else set())
+
+    # 複合名の構成要素（空白区切り）を抽出
+    parts = set()
+    for full in blocked_fullnames:
+        for p in full.split():
+            p = _nfkc_lower(p).strip()
+            if p:
+                parts.add(p)
+
+    # 既知の名簿も対象に
+    parts |= { _nfkc_lower(x).strip() for x in first_names | last_names }
+
+    # 軽いホワイトリスト（誤爆を避けたい一般語）
+    WHITELIST = {"maya","max","arnold","blender","unity","unreal"}
+    parts -= WHITELIST
+
+    # トークンをパージ
+    out = []
+    for t in tokens:
+        tt = _nfkc_lower(t).strip()
+        if tt in parts:
+            continue
+        out.append(t)
     return out
 
 # --- 4) ensure_50_70の後に背景重複を最終整理（補完で再注入された分を落とす） ---
@@ -286,10 +328,14 @@ def finalize_prompt_safe(
     return prompt_tags[:max_total]
 
 
-def finalize_pipeline(tokens: list[str]) -> list[str]:
+def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None) -> list[str]:
     tokens = normalize_terms(tokens)
     tokens = dedupe_background(tokens)
     tokens = drop_contradictions(tokens)
+
+    # ← ここで「人名断片」を掃除
+    tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
+
     tokens = finalize_prompt_safe(tokens, min_total=MIN_TOKENS, max_total=MAX_TOKENS)
     tokens = dedupe_background(tokens)  # 埋め戻しで背景語が再増殖した場合の最終整理
     if len(tokens) < MIN_TOKENS:
