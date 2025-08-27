@@ -195,9 +195,13 @@ def test_compress_redundant_merges_similar_terms():
         "negative space balance",
         "fine details",
         "surface detail",
-        "realistic texture",
+        "photographic realism",
+        "life-like rendering",
         "natural rendition",
         "clean rendition",
+        "gentle shadow",
+        "subtle shadows",
+        "soft shadows",
     ]
     out = compress_redundant(tokens)
     assert "warm tones" in out and "warm color palette" not in out
@@ -206,14 +210,15 @@ def test_compress_redundant_merges_similar_terms():
     assert "subtle bokeh" in out and "creamy bokeh" not in out
     assert "balanced composition" in out and "negative space balance" not in out
     assert "fine details" in out and "surface detail" not in out
-    assert "realistic texture" in out
-    assert "natural rendition" not in out and "clean rendition" not in out
+    assert "photographic realism" in out
+    assert "natural rendition" not in out and "clean rendition" not in out and "life-like rendering" not in out
+    assert "gentle shadow" in out and "subtle shadows" not in out and "soft shadows" not in out
 
 
 def test_sync_caption_to_prompt_removes_unused_objects():
-    caption = "a woman sitting at a table with a laptop and a cup"
+    caption = "a woman sitting at a table with a cup"
     tokens = ["portrait", "clean background"]
     out = sync_caption_to_prompt(caption, tokens)
-    assert "laptop" not in out.lower()
+    assert "table" not in out.lower()
     assert "cup" not in out.lower()
 

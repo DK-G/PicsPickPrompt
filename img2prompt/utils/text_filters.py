@@ -293,8 +293,9 @@ REDUNDANT_GROUPS = [
     {"subtle bokeh", "creamy bokeh"},
     {"balanced composition", "negative space balance"},
     {"fine details", "surface detail", "refined detail"},
-    {"realistic texture", "natural rendition", "clean rendition"},
     {"looking at camera", "eye contact"},
+    {"gentle shadow", "subtle shadows", "soft shadows"},
+    {"photographic realism", "life-like rendering", "natural rendition", "clean rendition"},
 ]
 
 PREFER_ORDER = {
@@ -304,8 +305,9 @@ PREFER_ORDER = {
     "subtle bokeh": 0,
     "balanced composition": 0,
     "fine details": 0,
-    "realistic texture": 0,
     "looking at camera": 0,
+    "gentle shadow": 0,
+    "photographic realism": 0,
 }
 
 # すべてのグループを索引化
@@ -340,6 +342,7 @@ def compress_redundant(tokens: list[str]) -> list[str]:
 
 
 CAPTION_OBJECTS = [
+    "table",
     "laptop",
     "phone",
     "camera",
@@ -367,9 +370,14 @@ def sync_caption_to_prompt(caption: str, tokens: list[str]) -> str:
     text = " " + caption.strip()
 
     for obj in CAPTION_OBJECTS:
-        if obj not in s and obj in text.lower():
-            pattern = rf"\s(?:with|holding|using|on)\b[^,\.]*\b{obj}s?\b[^,\.]*"
-            text = re.sub(pattern, "", text, flags=re.I)
+        if obj not in s and re.search(rf"\b{obj}s?\b", text, flags=re.I):
+            # with/holding/using/on/at/near/by/sitting at/standing at ... <obj>
+            patterns = [
+                rf"\s(?:with|holding|using|on|at|near|by)\b[^,\.]*\b{obj}s?\b",
+                rf"\s(?:sitting|standing)\s+(?:at|near|by)\b[^,\.]*\b{obj}s?\b",
+            ]
+            for pat in patterns:
+                text = re.sub(pat, "", text, flags=re.I)
 
     text = re.sub(r"\s{2,}", " ", text).strip(" ,.;")
     return text
@@ -530,7 +538,7 @@ def finalize_prompt_safe(
     return out
 
 
-def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, context=None) -> list[str]:
+def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, context=None, caption: str | None = None):
     tokens = normalize_terms(tokens)
     tokens = dedupe_background(tokens)
     tokens = unify_background(tokens)
@@ -538,7 +546,12 @@ def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, 
     tokens = drop_contradictions(tokens)
     tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
     tokens = finalize_prompt_safe(tokens, min_tokens=55, max_tokens=65, context=context)
+    tokens = compress_redundant(tokens)
     tokens = dedupe_background(tokens)
     tokens = unify_background(tokens)
+
+    if caption is not None:
+        synced = sync_caption_to_prompt(caption, tokens)
+        return tokens, synced
     return tokens
 

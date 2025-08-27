@@ -8,7 +8,6 @@ from .utils.text_filters import (
     clean_tokens,
     is_bad_token,
     finalize_pipeline,
-    sync_caption_to_prompt,
 )
 from .options.style_presets import apply_style, STYLE_PRESETS
 from .export import writer
@@ -84,10 +83,9 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
     )
     if style_preset:
         prompt_tags = apply_style(prompt_tags, style_preset)
-    prompt_tags = finalize_pipeline(prompt_tags)
+    prompt_tags, caption = finalize_pipeline(prompt_tags, caption=caption)
     final_count = len(prompt_tags)
     prompt = ", ".join(prompt_tags)
-    caption = sync_caption_to_prompt(caption, prompt_tags)
 
     style_name, params = style.determine_style(ci_raw, wd14_tags)
 
