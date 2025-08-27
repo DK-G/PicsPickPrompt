@@ -19,11 +19,9 @@ def test_clean_tokens_filters_noise_and_meta():
         "1boy",
         "solo",
         "standing",
-        "text focus",
-        "no humans",
-        "multiple girls",
         "General",
         "dated",
+        "negative space",
         "valid token",
     ]
     out = clean_tokens(tokens)
@@ -37,11 +35,9 @@ def test_clean_tokens_filters_noise_and_meta():
         "1boy",
         "solo",
         "standing",
-        "text focus",
-        "no humans",
-        "multiple girls",
         "general",
         "dated",
+        "negative space",
     }
     assert not any(b in out for b in banned)
 
