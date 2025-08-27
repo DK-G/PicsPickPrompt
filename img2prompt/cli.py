@@ -40,6 +40,7 @@ def run(image_path: str) -> Path:
         ci_tags = normalize.remove_placeholders(ci_raw)
         tags_debug["clip_interrogator"] = {
             "count": len(ci_tags),
+            "ok": True,
             "fallback_chunks": ci_fb,
         }
     except Exception as exc:  # pragma: no cover - should be rare
@@ -47,6 +48,7 @@ def run(image_path: str) -> Path:
         ci_tags, ci_text = {}, ""
         tags_debug["clip_interrogator"] = {
             "count": 0,
+            "ok": False,
             "fallback_chunks": 0,
             "error": str(exc),
         }
@@ -66,32 +68,68 @@ def run(image_path: str) -> Path:
         ordered.extend(buckets.get(key, []))
 
     def ensure_minimum_tags(existing, caption_text, ci_text_raw):
+        STOP_WORDS = {
+            "a",
+            "an",
+            "the",
+            "at",
+            "with",
+            "of",
+            "to",
+            "in",
+            "on",
+            "for",
+        }
+
+        NAME_EXCEPTIONS = {
+            "soft",
+            "warm",
+            "upper",
+            "looking",
+            "sharp",
+            "depth",
+            "wooden",
+            "window",
+            "natural",
+            "studio",
+            "light",
+            "lighting",
+            "focus",
+            "body",
+            "tones",
+            "interior",
+            "camera",
+            "field",
+            "bokeh",
+            "grain",
+            "cinematic",
+            "portrait",
+        }
+
+        def looks_like_name(phrase: str) -> bool:
+            parts = phrase.split()
+            if len(parts) == 2 and all(p.isalpha() for p in parts):
+                if not any(p in NAME_EXCEPTIONS for p in parts):
+                    return True
+            return False
+
         def clean_tokens(seq):
             cleaned = []
             for t in seq:
-                t = t.strip().lower()
+                t = re.sub(r",\s*", " ", t).strip().lower()
+                while True:
+                    parts = t.split()
+                    if parts and parts[-1] in STOP_WORDS:
+                        parts = parts[:-1]
+                        t = " ".join(parts)
+                    else:
+                        break
                 if not re.fullmatch(r"[a-z ]{2,48}", t):
                     continue
+                if looks_like_name(t):
+                    continue
                 cleaned.append(t)
-            # remove simple proper names
-            COMMON_NAMES = {
-                "john",
-                "mary",
-                "michael",
-                "david",
-                "james",
-                "jennifer",
-                "lisa",
-                "robert",
-                "mark",
-                "paul",
-            }
-
-            def looks_like_name(phrase: str) -> bool:
-                parts = phrase.split()
-                return len(parts) == 2 and all(p in COMMON_NAMES for p in parts)
-
-            return [t for t in cleaned if not looks_like_name(t)]
+            return cleaned
 
         tags = clean_tokens(dict.fromkeys(existing))
         if len(tags) >= 50:

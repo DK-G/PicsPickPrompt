@@ -26,7 +26,7 @@ def extract_palette(path: Path, colors: int = 5) -> List[str]:
         if arr.ndim != 3 or arr.shape[2] != 3 or arr.size < colors * 3:
             raise ValueError("invalid image array")
         arr = arr.reshape(-1, 3)
-        kmeans = KMeans(n_clusters=colors, n_init=4)
+        kmeans = KMeans(n_clusters=colors, n_init=4, random_state=0)
         kmeans.fit(arr)
         centres = kmeans.cluster_centers_.astype(int)
         hexes = ["#{:02x}{:02x}{:02x}".format(*c) for c in centres]
@@ -36,5 +36,5 @@ def extract_palette(path: Path, colors: int = 5) -> List[str]:
         return cleaned[:colors]
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("Palette extraction failed: %s", exc, exc_info=True)
-        fallback = ["#010101", "#020202", "#030303", "#040404", "#050505"]
+        fallback = ["#2a3d6d", "#dcb187", "#a56c4a", "#f2d6b0", "#1c1c1c"]
         return fallback[:colors]
