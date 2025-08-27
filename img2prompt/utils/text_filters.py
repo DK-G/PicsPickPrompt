@@ -2,7 +2,6 @@ import re, unicodedata
 import difflib
 import random
 import hashlib
-from typing import Sequence
 
 NUMERIC_PAT = re.compile(r"^\d+$")
 
@@ -295,6 +294,7 @@ REDUNDANT_GROUPS = [
     {"balanced composition", "negative space balance"},
     {"fine details", "surface detail", "refined detail"},
     {"realistic texture", "natural rendition", "clean rendition"},
+    {"looking at camera", "eye contact"},
 ]
 
 PREFER_ORDER = {
@@ -305,7 +305,23 @@ PREFER_ORDER = {
     "balanced composition": 0,
     "fine details": 0,
     "realistic texture": 0,
+    "looking at camera": 0,
 }
+
+# すべてのグループを索引化
+_ALL_GROUPS = [set(g) for g in REDUNDANT_GROUPS]
+_TERM2GID = {}
+for gid, group in enumerate(_ALL_GROUPS):
+    for term in group:
+        _TERM2GID[term.lower()] = gid
+
+def _would_be_group_dup(term: str, current: list[str]) -> bool:
+    """term を入れると同義グループが重複するか？（代表1語ルール）"""
+    gid = _TERM2GID.get(term.lower())
+    if gid is None:
+        return False
+    cur = {t.lower() for t in current}
+    return any(x in cur for x in _ALL_GROUPS[gid])
 
 
 def compress_redundant(tokens: list[str]) -> list[str]:
@@ -466,24 +482,25 @@ CONTRA_FILL = {
 }
 
 
-MIN_TOKENS = 55
-MAX_TOKENS = 65
-
-
-def _seed_from_context(context: Sequence[str] | None = None) -> int:
+def _seed_from_context(context=None) -> int:
     if not context:
-        return random.randrange(1 << 30)
-    h = hashlib.sha1(("||".join(context)).encode("utf-8")).hexdigest()
+        return 123456789
+    h = hashlib.sha1(("||".join(map(str, context))).encode("utf-8")).hexdigest()
     return int(h[:8], 16)
 
 
 def finalize_prompt_safe(
     tokens: list[str],
-    min_tokens: int = MIN_TOKENS,
-    max_tokens: int = MAX_TOKENS,
-    context: Sequence[str] | None = None,
+    min_tokens=55,
+    max_tokens=65,
+    context=None,
 ) -> list[str]:
     out = tokens[:]
+
+    # 1) 先に圧縮して冗長を削る
+    out = compress_redundant(out)
+
+    # 2) 補充（同義グループの重複は追加しない）
     if len(out) < min_tokens:
         rnd = random.Random(_seed_from_context(context or out))
         pool = SAFE_FILL[:]
@@ -499,9 +516,18 @@ def finalize_prompt_safe(
                 continue
             if any(c in seen for c in CONTRA_FILL.get(w, set())):
                 continue
+            if _would_be_group_dup(w, out):
+                continue
             out.append(w)
             seen.add(w)
-    return out[:max_tokens]
+
+    # 3) 念のためもう一度だけ圧縮
+    out = compress_redundant(out)
+
+    # 4) 上限で切り詰め
+    if len(out) > max_tokens:
+        out = out[:max_tokens]
+    return out
 
 
 def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, context=None) -> list[str]:
@@ -511,8 +537,7 @@ def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, 
     tokens = drop_invisible_clothes(tokens)
     tokens = drop_contradictions(tokens)
     tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
-    tokens = compress_redundant(tokens)
-    tokens = finalize_prompt_safe(tokens, min_tokens=MIN_TOKENS, max_tokens=MAX_TOKENS, context=context)
+    tokens = finalize_prompt_safe(tokens, min_tokens=55, max_tokens=65, context=context)
     tokens = dedupe_background(tokens)
     tokens = unify_background(tokens)
     return tokens
