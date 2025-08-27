@@ -30,7 +30,12 @@ def extract_tags(path: Path, threshold: float = 0.35) -> Tuple[Dict[str, float],
         _load()
     except Exception as exc:  # pragma: no cover - load failures
         logger.warning("DeepDanbooru load failed: %s", exc, exc_info=True)
-        return {}, str(exc)
+        msg = (
+            "tensorflow_io missing"
+            if isinstance(exc, ModuleNotFoundError) and "tensorflow_io" in str(exc)
+            else str(exc)
+        )
+        return {}, msg
 
     if _model is None or _tags is None:
         return {}, "DeepDanbooru model unavailable"

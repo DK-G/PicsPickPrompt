@@ -6,9 +6,13 @@ import csv
 import shutil
 
 import numpy as np
-import onnxruntime as ort
 from PIL import Image
 from huggingface_hub import hf_hub_download
+
+try:  # pragma: no cover - optional dependency for tests
+    import onnxruntime as ort
+except Exception:  # pragma: no cover - handled gracefully at runtime
+    ort = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,9 @@ def _load() -> None:
     if _session is not None and _tags is not None:
         return
     try:
+        if ort is None:
+            raise RuntimeError("onnxruntime not installed")
+
         bases = [
             Path(__file__).resolve().parent / "models",
             Path.cwd() / "models",
