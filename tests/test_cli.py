@@ -49,7 +49,7 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
     data = json.loads(Path(out).read_text("utf-8"))
 
     tags = [t.strip() for t in data["prompt"].split(",") if t.strip()]
-    assert 50 <= len(tags) <= 70
+    assert 55 <= len(tags) <= 70
     assert all(
         not t.startswith("subject_extra_") and not t.startswith("extra_tag_")
         for t in tags

@@ -25,7 +25,7 @@ ANIME_PARAMS = {
 def determine_style(ci_raw: str, wd14_tags: Dict[str, float]) -> Tuple[str, Dict[str, float]]:
     ci_low = (ci_raw or "").lower()
     anime_hits = sum(
-        k in ci_low for k in ["anime", "manga", "comic", "cartoon", "cel shading", "illustration"]
+        k in ci_low for k in ["anime", "manga", "comic", "cartoon", "cel shading"]
     )
     photo_hits = sum(
         k in ci_low
@@ -42,17 +42,10 @@ def determine_style(ci_raw: str, wd14_tags: Dict[str, float]) -> Tuple[str, Dict
         ]
     )
 
-    if anime_hits > photo_hits:
+    if anime_hits >= 2 and photo_hits == 0:
         style = "anime"
-    elif photo_hits > anime_hits:
-        style = "photo"
     else:
-        # WD14補助：アニメ強語が多いか
-        wd14_join = " ".join(wd14_tags.keys())
-        anime_present = any(
-            k in wd14_join for k in ["anime", "manga", "comic", "cartoon", "illustration"]
-        )
-        style = "anime" if anime_present else "photo"
+        style = "photo"
 
     params = PHOTO_PARAMS if style == "photo" else ANIME_PARAMS
     return style, params
