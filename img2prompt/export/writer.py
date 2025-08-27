@@ -32,7 +32,7 @@ REQUIRED_META = {"palette_hex", "tags_debug"}
 DEFAULT_DATA = {
     "caption": "an image",
     "prompt": "placeholder",
-    "negative_prompt": "low quality",
+    "negative_prompt": "(low quality:1.2), (blurry:1.2), (jpeg artifacts:1.1), (duplicate:1.1), (bad anatomy:1.1), (extra fingers:1.2), (nsfw:1.3), (monochrome:1.1), (lineart:1.1)",
     "style": "anime",
     "model_suggestion": "unspecified",
     "params": {

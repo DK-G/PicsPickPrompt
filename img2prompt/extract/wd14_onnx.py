@@ -25,6 +25,8 @@ NUMERIC_PAT = re.compile(r"^\d+$")
 
 _session = None
 _names_cats: List[tuple[str, str]] | None = None
+_names: List[str] | None = None
+_cats: List[str] | None = None
 
 
 def _ensure_files(model_dir: Path):
@@ -58,7 +60,7 @@ def _read_wd14_tags_csv(tags_path: Path):
 
 def _load() -> None:
     """Lazily load ONNX session and tag list."""
-    global _session, _names_cats
+    global _session, _names_cats, _names, _cats
     if _session is not None and _names_cats is not None:
         return
     try:
@@ -81,12 +83,15 @@ def _load() -> None:
             raise FileNotFoundError("WD14 model files missing")
         _session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
         _names_cats = _read_wd14_tags_csv(tags_path)
+        _names = [n for n, _ in _names_cats]
+        _cats = [c for _, c in _names_cats]
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("WD14 load failed: %s", exc, exc_info=True)
         _session, _names_cats = None, None
 
 
-def _postprocess_wd14(scores, names_cats, threshold: float = 0.23, topk: int = 60) -> Dict[str, float]:
+def _postprocess_wd14(scores, threshold: float = 0.23, topk: int = 60) -> Dict[str, float]:
+    names_cats = list(zip(_names or [], _cats or []))
     # 1) threshold filter and basic cleaning
     items = []
     for (tag, cat), sc in zip(names_cats, scores.tolist()):
@@ -136,7 +141,7 @@ def extract_tags(path: Path, threshold: float = 0.23, topk: int = 60) -> Dict[st
         x = x[np.newaxis, ...]  # (1,448,448,3)
         input_name = _session.get_inputs()[0].name
         y = _session.run(None, {input_name: x})[0][0]  # (num_tags,)
-        return _postprocess_wd14(y, _names_cats, threshold, topk)
+        return _postprocess_wd14(y, threshold, topk)
     except Exception as exc:  # pragma: no cover - inference failures
         logger.warning("WD14 inference failed: %s", exc, exc_info=True)
         return {}
