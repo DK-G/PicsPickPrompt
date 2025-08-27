@@ -132,7 +132,9 @@ def ensure_50_70(
     max_total: int = 70,
     allow=None,
 ) -> List[str]:
+    import re
     allow = allow or (lambda w: True)
+
     nounish = [
         p.strip()
         for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
@@ -141,28 +143,36 @@ def ensure_50_70(
 
     merged: List[str] = []
     seen: set[str] = set()
+    bg_kept = False
 
     def add_many(src: List[str] | None, limit: int | None = None) -> None:
-        nonlocal merged
+        nonlocal bg_kept
         for w in src or []:
             w = (w or "").strip(" ,").lower()
             if not w or w in seen:
                 continue
-            if not allow(w):
-                continue
-            if 2 <= len(w) <= 40:
-                merged.append(w)
-                seen.add(w)
-                if limit and len(merged) >= limit:
-                    break
+            # 背景は1個だけ
+            if "background" in w:
+                if bg_kept:
+                    continue
+                if not allow(w):
+                    continue
+                bg_kept = True
+            else:
+                if not allow(w):
+                    continue
+            merged.append(w)
+            seen.add(w)
+            if limit and len(merged) >= limit:
+                break
 
     add_many(tags)
     if len(merged) < min_total:
-        add_many(nounish, limit=min_total)
+        add_many(nounish, min_total)
     if len(merged) < min_total:
-        add_many(ci_picks, limit=min_total)
+        add_many(ci_picks, min_total)
     if len(merged) < min_total:
-        add_many(FLOOR, limit=min_total)
+        add_many(FLOOR, min_total)
     if len(merged) < min_total:
-        add_many(FILLER_BANK, limit=min_total)
+        add_many(FILLER_BANK, min_total)
     return merged[:max_total]

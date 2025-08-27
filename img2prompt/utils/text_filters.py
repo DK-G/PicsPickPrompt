@@ -136,7 +136,13 @@ def dedupe_background(tags):
 
 
 def is_bad_token(raw: str) -> bool:
+    """補完時にも再利用できる禁止語判定。まず“安全語は常に許可”。"""
     t = _nfkc_lower(raw or "")
+    # ✅ 先にホワイトリスト優先
+    if (t in SAFE_EXACT) or any(k in t for k in SAFE_SUBSTR):
+        return False
+
+    # ❌ 通常のNG判定
     if not (2 <= len(t) <= 40):
         return True
     if NUMERIC_PAT.match(t):
