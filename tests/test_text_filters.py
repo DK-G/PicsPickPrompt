@@ -18,6 +18,10 @@ def test_clean_tokens_filters_noise_and_meta():
         "1girl",
         "1boy",
         "solo",
+        "standing",
+        "text focus",
+        "no humans",
+        "multiple girls",
         "General",
         "dated",
         "valid token",
@@ -32,6 +36,10 @@ def test_clean_tokens_filters_noise_and_meta():
         "1girl",
         "1boy",
         "solo",
+        "standing",
+        "text focus",
+        "no humans",
+        "multiple girls",
         "general",
         "dated",
     }
@@ -43,6 +51,16 @@ def test_clean_tokens_strips_artist_names_case_insensitive():
         "Ayami Kojima",
         "ayami kojima",
         "Makoto Shinkai",
+        "soft lighting",
+    ]
+    out = clean_tokens(tokens)
+    assert out == ["soft lighting"]
+
+
+def test_clean_tokens_filters_typos_in_artist_names():
+    tokens = [
+        "ayami koj ima",
+        "matoko shinkai",
         "soft lighting",
     ]
     out = clean_tokens(tokens)
