@@ -134,3 +134,39 @@ def dedupe_background(tags):
         out.append(t)
     return out
 
+
+def is_bad_token(raw: str) -> bool:
+    t = _nfkc_lower(raw or "")
+    if not (2 <= len(t) <= 40):
+        return True
+    if NUMERIC_PAT.match(t):
+        return True
+    if _looks_like_artist(raw):
+        return True
+    if t in META_EXACT or t in BAN_EXACT:
+        return True
+    if any(p in t for p in BAN_PHRASES_SUBSTR):
+        return True
+    if any(b in t for b in BAN_SUBSTR):
+        return True
+    return False
+
+
+NORMALIZE_MAP = {
+    "looking at viewer": "looking at camera",
+    "eye level": "eye level view",
+    "white background": "clean background",
+    "grey background": "clean background",
+    "simple background": "clean background",
+}
+
+
+def normalize_terms(tags: list[str]) -> list[str]:
+    out, seen = [], set()
+    for t in tags:
+        t2 = NORMALIZE_MAP.get(t, t)
+        if t2 not in seen:
+            seen.add(t2)
+            out.append(t2)
+    return out
+
