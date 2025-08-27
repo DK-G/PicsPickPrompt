@@ -53,7 +53,7 @@ def test_clean_tokens_strips_artist_names_case_insensitive():
     assert out == ["soft lighting"]
 
 
-def test_clean_tokens_filters_typos_in_artist_names():
+def test_clean_tokens_allows_artist_name_typos():
     tokens = [
         "ayami koj ima",
         "matoko shinkai",
@@ -61,7 +61,11 @@ def test_clean_tokens_filters_typos_in_artist_names():
         "soft lighting",
     ]
     out = clean_tokens(tokens)
-    assert out == ["soft lighting"]
+    assert out == [
+        "matoko shinkai",
+        "deayami kojima",
+        "soft lighting",
+    ]
 
 
 def test_clean_tokens_unifies_background_tags():
@@ -78,10 +82,10 @@ def test_clean_tokens_unifies_background_tags():
     assert "soft lighting" in out
 
 
-def test_clean_tokens_filters_single_name_tokens():
+def test_clean_tokens_allows_single_name_tokens():
     tokens = ["ayami", "shinkai", "soft lighting"]
     out = clean_tokens(tokens)
-    assert out == ["soft lighting"]
+    assert out == ["ayami", "shinkai", "soft lighting"]
 
 
 def test_dedupe_background_removes_extra_backgrounds():

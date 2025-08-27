@@ -2,7 +2,7 @@ import re, unicodedata
 
 NUMERIC_PAT = re.compile(r"^\d+$")
 
-# --- 1) 人名判定：崩れ・typo・姓/名単体も検出 ---
+# --- 1) 人名判定（フルネーム一致のみ） ---
 ARTIST_FULL = {
     "ayami kojima",
     "rei hiroe",
@@ -42,42 +42,9 @@ ARTIST_FIRST = {
 def _looks_like_artist(raw: str) -> bool:
     s = _nfkc_lower(raw)
     nos = s.replace(" ", "")
-    # 1) 完全一致 / 空白除去一致
     if s in ARTIST_FULL or nos in {a.replace(" ", "") for a in ARTIST_FULL}:
         return True
-    # 2) 語単位で姓/名が出たら“人名っぽい”
-    words = set(s.split())
-    if (words & ARTIST_LAST) or (words & ARTIST_FIRST):
-        return True
-
-    # 3) 軽微typo（距離<=2）でフルネームに近い
-    def _lev2(a: str, b: str) -> int:
-        if a == b:
-            return 0
-        if abs(len(a) - len(b)) > 2:
-            return 3
-        i = j = edits = 0
-        while i < len(a) and j < len(b):
-            if a[i] == b[j]:
-                i += 1
-                j += 1
-            else:
-                edits += 1
-                if edits > 2:
-                    return edits
-                if len(a) == len(b):
-                    i += 1
-                    j += 1
-                elif len(a) > len(b):
-                    i += 1
-                else:
-                    j += 1
-        edits += (len(a) - i) + (len(b) - j)
-        return edits
-
-    for full in ARTIST_FULL:
-        if _lev2(nos, full.replace(" ", "")) <= 2:
-            return True
+    # シングル単語や軽微なtypoはここでは弾かない
     return False
 
 # --- 2) 写真語ホワイトリスト（先に通す） ---
@@ -93,7 +60,7 @@ SAFE_EXACT = {
     "gentle shadow","natural skin tones","ambient light","balanced composition",
     "eye level view","soft contrast","realistic texture","warm color palette",
     "fine details","cinematic feel","subtle bokeh","subtle shadows","smooth gradients",
-    "natural highlights","muted colors","shallow depth","soft focus",
+    "natural highlights","muted colors","shallow depth","soft focus","clean background",
 }
 
 # --- 3) 落とす語（最小限&明示） ---
