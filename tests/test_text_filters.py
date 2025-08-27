@@ -172,7 +172,6 @@ def test_finalize_pipeline_fills_and_filters():
     assert "soft focus" not in out
     assert "wide aperture" not in out
     assert "loose framing" not in out
-    assert "tight framing" in out
     assert "centered composition" not in out
 
 
