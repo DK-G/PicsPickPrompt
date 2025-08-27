@@ -65,7 +65,7 @@ def run(image_path: str) -> Path:
     ]:
         ordered.extend(buckets.get(key, []))
 
-    merged_before = bucketize.ensure_50_70(ordered, caption, ci_picks)
+    merged_before = ordered
     prompt_tags = clean_tokens(merged_before)
     prompt_tags_final = bucketize.ensure_50_70(prompt_tags, caption, ci_picks)
     prompt = ", ".join(prompt_tags_final)
@@ -74,14 +74,15 @@ def run(image_path: str) -> Path:
 
     print(
         f"[DEBUG] wd14_raw={len(wd14_tags_raw)} -> wd14_clean={len(wd14_tags)}; ci_raw_picks={len(ci_picks)}; "
-        f"merged_before_clean={len(merged_before)}; after_clean={len(prompt_tags)}; final={len(prompt_tags_final)}; style={style_name}"
+        f"merged_before={len(merged_before)}; after_clean={len(prompt_tags)}; final={len(prompt_tags_final)}; style={style_name}"
     )
 
     data = {
         "caption": caption,
         "prompt": prompt,
         "negative_prompt": (
-            "low quality, worst quality, blurry, jpeg artifacts, watermark, text, extra fingers, deformed hands, bad anatomy"
+            "(low quality:1.2), (blurry:1.2), (jpeg artifacts:1.1), (duplicate:1.1), "
+            "(bad anatomy:1.1), (extra fingers:1.2), (nsfw:1.3), (monochrome:1.1), (lineart:1.1)"
         ),
         "style": style_name,
         "model_suggestion": "unspecified",
