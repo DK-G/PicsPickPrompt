@@ -18,12 +18,12 @@ def run(image_path: str) -> Path:
     tags_debug = {}
 
     try:
-        wd_raw = wd14_onnx.extract_tags(image_path)
-        wd_tags = normalize.remove_placeholders(wd_raw)
-        tags_debug["wd14_onnx"] = {"count": len(wd_tags), "ok": True}
+        wd14_tags_raw = wd14_onnx.extract_tags(image_path)
+        wd14_tags = normalize.remove_placeholders(wd14_tags_raw)
+        tags_debug["wd14_onnx"] = {"count": len(wd14_tags), "ok": True}
     except Exception as exc:  # pragma: no cover - should be rare
         logger.warning("WD14 extractor failed: %s", exc, exc_info=True)
-        wd_tags = {}
+        wd14_tags = {}
         tags_debug["wd14_onnx"] = {"count": 0, "ok": False, "error": str(exc)}
 
     try:
@@ -51,7 +51,7 @@ def run(image_path: str) -> Path:
             "error": str(exc),
         }
 
-    merged = normalize.merge_tags(wd_tags, dd_tags, ci_tags)
+    merged = normalize.merge_tags(wd14_tags, dd_tags, ci_tags)
     buckets = bucketize.bucketize(merged)
 
     ordered = []
@@ -65,15 +65,16 @@ def run(image_path: str) -> Path:
     ]:
         ordered.extend(buckets.get(key, []))
 
-    prompt_tags = bucketize.ensure_50_70(ordered, caption, ci_picks)
-    prompt_tags = clean_tokens(prompt_tags)
-    prompt = ", ".join(prompt_tags)
+    merged_before = bucketize.ensure_50_70(ordered, caption, ci_picks)
+    prompt_tags = clean_tokens(merged_before)
+    prompt_tags_final = bucketize.ensure_50_70(prompt_tags, caption, ci_picks)
+    prompt = ", ".join(prompt_tags_final)
 
-    style_name, params = style.determine_style(ci_raw, wd_tags)
+    style_name, params = style.determine_style(ci_raw, wd14_tags)
 
     print(
-        f"[DEBUG] wd14={len(wd_tags)}, dd={len(dd_tags)}, ci={len(ci_tags)}, "
-        f"final={len(prompt_tags)}, style={style_name}"
+        f"[DEBUG] wd14_raw={len(wd14_tags_raw)} -> wd14_clean={len(wd14_tags)}; ci_raw_picks={len(ci_picks)}; "
+        f"merged_before_clean={len(merged_before)}; after_clean={len(prompt_tags)}; final={len(prompt_tags_final)}; style={style_name}"
     )
 
     data = {
