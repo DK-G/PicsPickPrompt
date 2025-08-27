@@ -16,8 +16,8 @@ def test_determine_style_photo_params():
 
 
 def test_determine_style_anime_params():
-    ci_text = "an illustration of a cat"
-    result, params = style.determine_style(ci_text, {"anime": 0.9})
+    ci_text = "an anime manga character"
+    result, params = style.determine_style(ci_text, {})
     assert result == "anime"
     assert params == style.ANIME_PARAMS
 

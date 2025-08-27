@@ -67,14 +67,18 @@ def run(image_path: str) -> Path:
 
     merged_before = ordered
     prompt_tags = clean_tokens(merged_before)
-    prompt_tags_final = bucketize.ensure_50_70(prompt_tags, caption, ci_picks)
-    prompt = ", ".join(prompt_tags_final)
+    after_clean = len(prompt_tags)
+    prompt_tags = bucketize.ensure_50_70(
+        prompt_tags, caption, ci_picks, min_total=55, max_total=70
+    )
+    final_count = len(prompt_tags)
+    prompt = ", ".join(prompt_tags)
 
     style_name, params = style.determine_style(ci_raw, wd14_tags)
 
     print(
         f"[DEBUG] wd14_raw={len(wd14_tags_raw)} -> wd14_clean={len(wd14_tags)}; ci_raw_picks={len(ci_picks)}; "
-        f"merged_before={len(merged_before)}; after_clean={len(prompt_tags)}; final={len(prompt_tags_final)}; style={style_name}"
+        f"merged_before={len(merged_before)}; after_clean={after_clean}; final={final_count}; style={style_name}"
     )
 
     data = {
