@@ -15,30 +15,22 @@ def _load() -> None:
     global _model, _tags
     if _model is not None and _tags is not None:
         return
-    try:
-        import deepdanbooru as dd  # type: ignore
+    import deepdanbooru as dd  # type: ignore
 
-        project_path = dd.project.default_project_path()
-        _model = dd.project.load_model_from_project(project_path)
-        _tags = dd.project.load_tags_from_project(project_path)
-        _model.eval()
-    except Exception as exc:  # pragma: no cover - fallback path
-        logger.warning("Failed to load DeepDanbooru model: %s", exc, exc_info=True)
-        _model = None
-        _tags = None
+    project_path = dd.project.default_project_path()
+    _model = dd.project.load_model_from_project(project_path)
+    _tags = dd.project.load_tags_from_project(project_path)
+    _model.eval()
 
 
 def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
-    """Return tags and scores for ``path``.
+    """Return tags and scores for ``path``."""
 
-    When inference fails, an empty dictionary is returned.
-    """
+    _load()
+    if _model is None or _tags is None:
+        raise RuntimeError("DeepDanbooru model unavailable")
 
     try:
-        _load()
-        if _model is None or _tags is None:
-            raise RuntimeError("DeepDanbooru model unavailable")
-
         from PIL import Image
         import numpy as np
         import torch
@@ -56,6 +48,5 @@ def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
                 tag = tag.replace("_", " ")
                 result[tag] = float(score)
         return result
-    except Exception as exc:  # pragma: no cover - fallback path
-        logger.warning("DeepDanbooru inference failed: %s", exc, exc_info=True)
-        return {}
+    except Exception as exc:  # pragma: no cover - inference failures
+        raise RuntimeError(str(exc)) from exc

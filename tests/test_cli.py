@@ -68,3 +68,43 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
     for key in ["width", "height", "steps", "cfg_scale"]:
         assert params[key] > 0
     assert params["sampler"]
+
+
+def test_cli_handles_deepdanbooru_failure(tmp_path, monkeypatch):
+    img_path = tmp_path / "test.jpg"
+    img_path.write_bytes(b"fake")
+
+    monkeypatch.setattr(cli.blip, "generate_caption", lambda p: "a caption")
+
+    letters = string.ascii_lowercase
+
+    def alpha_tag(i: int) -> str:
+        return "tag" + letters[i % 26] + letters[(i // 26) % 26]
+
+    wd_tags = {alpha_tag(i): 1.0 for i in range(20)}
+    monkeypatch.setattr(cli.wd14_onnx, "extract_tags", lambda p: wd_tags)
+
+    def dd_fail(p):
+        raise RuntimeError("tensorflow_io missing")
+
+    monkeypatch.setattr(cli.deepdanbooru, "extract_tags", dd_fail)
+
+    ci_tags = {alpha_tag(i): 0.5 for i in range(40, 80)}
+    monkeypatch.setattr(
+        cli.clip_interrogator,
+        "extract_tags",
+        lambda p: (ci_tags, "soft lighting, 35mm", 0),
+    )
+
+    monkeypatch.setattr(
+        cli.palette,
+        "extract_palette",
+        lambda p: ["#010101", "#020202", "#030303", "#040404", "#050505"],
+    )
+
+    out = cli.run(str(img_path))
+    data = json.loads(Path(out).read_text("utf-8"))
+    dbg = data["meta"]["tags_debug"]["deepdanbooru"]
+    assert dbg["count"] == 0
+    assert dbg["ok"] is False
+    assert "tensorflow_io" in dbg["error"]
