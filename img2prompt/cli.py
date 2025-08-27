@@ -7,9 +7,7 @@ from .assemble import normalize, bucketize, palette, style
 from .utils.text_filters import (
     clean_tokens,
     is_bad_token,
-    normalize_terms,
-    dedupe_background,
-    finalize_prompt_safe,
+    finalize_pipeline,
 )
 from .options.style_presets import apply_style, STYLE_PRESETS
 from .export import writer
@@ -83,9 +81,7 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
         max_total=70,
         allow=lambda w: not is_bad_token(w),
     )
-    prompt_tags = normalize_terms(prompt_tags)
-    prompt_tags = dedupe_background(prompt_tags)
-    prompt_tags = finalize_prompt_safe(prompt_tags, min_total=55, max_total=70)
+    prompt_tags = finalize_pipeline(prompt_tags)
     final_count = len(prompt_tags)
     if style_preset:
         prompt_tags = apply_style(prompt_tags, style_preset)

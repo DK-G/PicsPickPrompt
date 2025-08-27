@@ -6,7 +6,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 
-from img2prompt.utils.text_filters import clean_tokens, dedupe_background, is_bad_token
+from img2prompt.utils.text_filters import (
+    clean_tokens,
+    dedupe_background,
+    drop_contradictions,
+    finalize_pipeline,
+    is_bad_token,
+)
 
 
 def test_clean_tokens_filters_noise_and_meta():
@@ -53,7 +59,7 @@ def test_clean_tokens_strips_artist_names_case_insensitive():
     assert out == ["soft lighting"]
 
 
-def test_clean_tokens_allows_artist_name_typos():
+def test_clean_tokens_filters_artist_name_typos():
     tokens = [
         "ayami koj ima",
         "matoko shinkai",
@@ -61,11 +67,7 @@ def test_clean_tokens_allows_artist_name_typos():
         "soft lighting",
     ]
     out = clean_tokens(tokens)
-    assert out == [
-        "matoko shinkai",
-        "deayami kojima",
-        "soft lighting",
-    ]
+    assert out == ["soft lighting"]
 
 
 def test_clean_tokens_unifies_background_tags():
@@ -99,4 +101,30 @@ def test_is_bad_token_handles_whitelist_and_bans():
     assert is_bad_token("Makoto Shinkai")
     assert is_bad_token("123")
     assert not is_bad_token("soft lighting")
+
+
+def test_drop_contradictions_removes_conflicting_tags():
+    tags = ["long hair", "short hair", "soft lighting", "open mouth", "closed mouth"]
+    out = drop_contradictions(tags)
+    assert "long hair" not in out
+    assert "short hair" not in out
+    assert "open mouth" not in out
+    assert "closed mouth" not in out
+    assert "soft lighting" in out
+
+
+def test_finalize_pipeline_fills_and_filters():
+    sample = [
+        "portrait",
+        "long hair",
+        "short hair",
+        "clean background",
+        "ayami koj ima",
+        "looking at camera",
+    ]
+    cleaned = clean_tokens(sample)
+    out = finalize_pipeline(cleaned)
+    assert 55 <= len(out) <= 65
+    assert "ayami koj ima" not in out
+    assert not ({"long hair", "short hair"} & set(out))
 
