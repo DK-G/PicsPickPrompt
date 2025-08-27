@@ -107,3 +107,40 @@ def test_cli_handles_deepdanbooru_failure(tmp_path, monkeypatch):
     assert dbg["count"] == 0
     assert dbg["ok"] is False
     assert "tensorflow_io" in dbg["error"]
+
+
+def test_cli_applies_style_preset(tmp_path, monkeypatch):
+    img_path = tmp_path / "test.jpg"
+    img_path.write_bytes(b"fake")
+
+    monkeypatch.setattr(cli.blip, "generate_caption", lambda p: "a caption")
+
+    letters = string.ascii_lowercase
+
+    def alpha_tag(i: int) -> str:
+        return "tag" + letters[i % 26]
+
+    wd_tags = {alpha_tag(i): 1.0 for i in range(5)}
+    monkeypatch.setattr(cli.wd14_onnx, "extract_tags", lambda p: wd_tags)
+
+    dd_tags = {alpha_tag(i + 5): 1.0 for i in range(5)}
+    monkeypatch.setattr(cli.deepdanbooru, "extract_tags", lambda p: (dd_tags, None))
+
+    ci_tags = {alpha_tag(i + 10): 0.5 for i in range(5)}
+    monkeypatch.setattr(
+        cli.clip_interrogator,
+        "extract_tags",
+        lambda p: (ci_tags, list(ci_tags), "soft lighting, 35mm"),
+    )
+
+    monkeypatch.setattr(
+        cli.palette,
+        "extract_palette",
+        lambda p: ["#010101", "#020202", "#030303", "#040404", "#050505"],
+    )
+
+    out = cli.run(str(img_path), style_preset="cinematic")
+    data = json.loads(Path(out).read_text("utf-8"))
+    tags = [t.strip() for t in data["prompt"].split(",") if t.strip()]
+    assert "cinematic feel" in tags
+    assert "bokeh" in tags
