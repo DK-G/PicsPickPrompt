@@ -11,6 +11,7 @@ from img2prompt.utils.text_filters import (
     dedupe_background,
     drop_contradictions,
     compress_redundant,
+    adjust_framing_for_cues,
     finalize_pipeline,
     is_bad_token,
     unify_background,
@@ -117,7 +118,7 @@ def test_drop_contradictions_removes_conflicting_tags():
         "tight framing",
         "loose framing",
         "bust shot",
-        "rule of thirds",
+        "balanced composition",
         "centered composition",
         "soft focus",
         "sharp focus",
@@ -156,10 +157,9 @@ def test_finalize_pipeline_fills_and_filters():
         "sharp focus",
         "wide aperture",
         "narrow aperture",
-        "tight framing",
         "loose framing",
         "bust shot",
-        "rule of thirds",
+        "balanced composition",
         "centered composition",
     ]
     cleaned = clean_tokens(sample)
@@ -172,6 +172,8 @@ def test_finalize_pipeline_fills_and_filters():
     assert "soft focus" not in out
     assert "wide aperture" not in out
     assert "loose framing" not in out
+    assert "tight framing" in out
+    assert "centered composition" not in out
 
 
 def test_unify_background_groups_synonyms():
@@ -197,11 +199,14 @@ def test_compress_redundant_merges_similar_terms():
         "surface detail",
         "photographic realism",
         "life-like rendering",
+        "realistic texture",
         "natural rendition",
         "clean rendition",
         "gentle shadow",
         "subtle shadows",
         "soft shadows",
+        "gentle tonality",
+        "soft tonality",
     ]
     out = compress_redundant(tokens)
     assert "warm tones" in out and "warm color palette" not in out
@@ -210,9 +215,10 @@ def test_compress_redundant_merges_similar_terms():
     assert "subtle bokeh" in out and "creamy bokeh" not in out
     assert "balanced composition" in out and "negative space balance" not in out
     assert "fine details" in out and "surface detail" not in out
-    assert "photographic realism" in out
-    assert "natural rendition" not in out and "clean rendition" not in out and "life-like rendering" not in out
+    assert "photographic realism" in out and "life-like rendering" not in out
+    assert "realistic texture" in out and "natural rendition" not in out and "clean rendition" not in out
     assert "gentle shadow" in out and "subtle shadows" not in out and "soft shadows" not in out
+    assert "gentle tonality" in out and "soft tonality" not in out
 
 
 def test_sync_caption_to_prompt_removes_unused_objects():
@@ -221,4 +227,11 @@ def test_sync_caption_to_prompt_removes_unused_objects():
     out = sync_caption_to_prompt(caption, tokens)
     assert "table" not in out.lower()
     assert "cup" not in out.lower()
+
+
+def test_adjust_framing_for_cues_converts_loose_to_tight():
+    tokens = ["upper body", "loose framing", "soft lighting"]
+    out = adjust_framing_for_cues(tokens)
+    assert "tight framing" in out
+    assert "loose framing" not in out
 
