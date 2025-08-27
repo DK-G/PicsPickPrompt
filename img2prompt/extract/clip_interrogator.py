@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Dict, Tuple
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +20,26 @@ CANDIDATES = [
     "studio light",
 ]
 
+KEYS = [
+    "lighting",
+    "light",
+    "bokeh",
+    "grain",
+    "35mm",
+    "cinematic",
+    "sharp focus",
+    "depth of field",
+    "studio",
+    "natural",
+    "photograph",
+]
 
-def extract_tags(path: Path) -> Tuple[Dict[str, float], str, int]:
-    """Run the interrogator and return tags, raw text, and fallback count."""
+
+def extract_tags(path: Path) -> Tuple[Dict[str, float], str]:
+    """Run the interrogator and return tags and raw text."""
     try:
         from clip_interrogator import Config, Interrogator
         from PIL import Image
-        import re
 
         cfg = Config()
         ci = Interrogator(cfg)
@@ -39,35 +53,18 @@ def extract_tags(path: Path) -> Tuple[Dict[str, float], str, int]:
                 result[cand] = 0.55
 
         # 2) 追加フォールバック：テキストから句を抽出して拾う
-        picks = []
-        for chunk in re.split(r"[,\n]", text):
-            w = chunk.strip()
-            if not (2 <= len(w) <= 48):
-                continue
-            if any(
-                k in w
-                for k in [
-                    "lighting",
-                    "light",
-                    "bokeh",
-                    "grain",
-                    "35mm",
-                    "cinematic",
-                    "sharp focus",
-                    "depth of field",
-                    "studio",
-                    "natural",
-                ]
-            ):
-                picks.append(w)
-        # 上限15件・重複回避・やや低めの確度
-        for w in picks[:15]:
+        chunks = [c.strip() for c in re.split(r"[,\n]", text)]
+        picked = []
+        for c in chunks:
+            if 2 <= len(c) <= 48 and any(k in c for k in KEYS):
+                picked.append(c)
+        for w in picked[:15]:
             result.setdefault(w, 0.50)
 
-        return result, text, len(picks[:15])
+        return result, text
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("CLIP Interrogator failed: %s", exc, exc_info=True)
-        return {}, "", 0
+        return {}, ""
 
 
 def extract_text(path: Path) -> str:

@@ -36,7 +36,7 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli.clip_interrogator,
         "extract_tags",
-        lambda p: (ci_tags, "soft lighting, 35mm", 0),
+        lambda p: (ci_tags, "soft lighting, 35mm"),
     )
 
     monkeypatch.setattr(
@@ -60,7 +60,6 @@ def test_cli_generates_clean_output(tmp_path, monkeypatch):
     assert dbg["deepdanbooru"]["ok"] is True
     assert dbg["clip_interrogator"]["count"] == 40
     assert dbg["clip_interrogator"]["ok"] is True
-    assert dbg["clip_interrogator"]["fallback_chunks"] == 0
     assert dbg["wd14_onnx"]["count"] == 20
     assert dbg["wd14_onnx"]["ok"] is True
     assert data["style"] in {"anime", "photo"}
@@ -93,7 +92,7 @@ def test_cli_handles_deepdanbooru_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli.clip_interrogator,
         "extract_tags",
-        lambda p: (ci_tags, "soft lighting, 35mm", 0),
+        lambda p: (ci_tags, "soft lighting, 35mm"),
     )
 
     monkeypatch.setattr(
