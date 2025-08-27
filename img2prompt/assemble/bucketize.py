@@ -1,4 +1,7 @@
 from typing import Dict, List
+import re
+
+from ..utils.text_filters import strip_names
 
 # Seed tags for each bucket used for initial categorisation.
 BUCKET_SEEDS: Dict[str, List[str]] = {
@@ -108,3 +111,43 @@ def bucketize(tags: Dict[str, float]) -> Dict[str, List[str]]:
             total += 1
 
     return buckets
+
+
+def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str]) -> List[str]:
+    """Ensure the final prompt tag list has between 50 and 70 entries.
+
+    The input ``tags`` is the ordered list from bucketization. Additional
+    phrases are sourced from the BLIP caption and CLIP Interrogator fallback
+    phrases. A small set of fixed words provides a safety net when the list
+    is still too short.
+    """
+
+    nounish = [
+        p.strip()
+        for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
+        if 1 <= len(p.split()) <= 4
+    ]
+    extra = (ci_picks or [])[:15]
+    floor = [
+        "portrait",
+        "upper body",
+        "looking at camera",
+        "soft lighting",
+        "warm tones",
+        "sharp focus",
+        "depth of field",
+        "wooden interior",
+        "window light",
+        "cozy atmosphere",
+        "warm highlights",
+        "gentle shadow",
+    ]
+
+    out = list(dict.fromkeys(tags + nounish[:20] + extra + floor))
+    out = [t.strip(", ") for t in out if 2 <= len(t) <= 40]
+    out = strip_names(out)
+    if len(out) < 50:
+        while len(out) < 50:
+            out += [w for w in floor if w not in out]
+            out = out[:50]
+    return out[:70]

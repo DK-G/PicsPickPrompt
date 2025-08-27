@@ -1,7 +1,9 @@
 """Tag normalization and merging utilities."""
 
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, List
+
+from ..utils.text_filters import strip_names
 
 SYNONYMS = {
     "serafuku": "school uniform",
@@ -50,3 +52,13 @@ def merge_tags(
         else:
             normalized[canonical] = score
     return dict(sorted(normalized.items(), key=lambda x: x[1], reverse=True))
+
+
+def strip_name_tokens(tags: List[str]) -> List[str]:
+    """Remove personal names or banned tokens from ``tags``.
+
+    This uses simple heuristics to filter out two-word western style
+    names and known bad tokens that should not appear in prompts.
+    """
+
+    return strip_names(tags)

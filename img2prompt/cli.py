@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-import re
 import logging
 
 from .extract import blip, clip_interrogator, deepdanbooru, wd14_onnx
@@ -39,20 +38,15 @@ def run(image_path: str) -> Path:
         tags_debug["deepdanbooru"] = {"count": 0, "ok": False, "error": str(exc)}
 
     try:
-        ci_raw, ci_text, ci_fb = clip_interrogator.extract_tags(image_path)
+        ci_raw, ci_text = clip_interrogator.extract_tags(image_path)
         ci_tags = normalize.remove_placeholders(ci_raw)
-        tags_debug["clip_interrogator"] = {
-            "count": len(ci_tags),
-            "ok": True,
-            "fallback_chunks": ci_fb,
-        }
+        tags_debug["clip_interrogator"] = {"count": len(ci_tags), "ok": True}
     except Exception as exc:  # pragma: no cover - should be rare
         logger.warning("CLIP Interrogator extractor failed: %s", exc, exc_info=True)
         ci_tags, ci_text = {}, ""
         tags_debug["clip_interrogator"] = {
             "count": 0,
             "ok": False,
-            "fallback_chunks": 0,
             "error": str(exc),
         }
 
@@ -70,116 +64,9 @@ def run(image_path: str) -> Path:
     ]:
         ordered.extend(buckets.get(key, []))
 
-    def ensure_minimum_tags(existing, caption_text, ci_text_raw):
-        STOP_WORDS = {
-            "a",
-            "an",
-            "the",
-            "at",
-            "with",
-            "of",
-            "to",
-            "in",
-            "on",
-            "for",
-        }
-
-        NAME_EXCEPTIONS = {
-            "soft",
-            "warm",
-            "upper",
-            "looking",
-            "sharp",
-            "depth",
-            "wooden",
-            "window",
-            "natural",
-            "studio",
-            "light",
-            "lighting",
-            "focus",
-            "body",
-            "tones",
-            "interior",
-            "camera",
-            "field",
-            "bokeh",
-            "grain",
-            "cinematic",
-            "portrait",
-        }
-
-        NAME_RE = re.compile(r"\b[a-z][a-z]+ [a-z][a-z]+\b", re.I)
-
-        def looks_like_name(phrase: str) -> bool:
-            if NAME_RE.fullmatch(phrase):
-                parts = phrase.split()
-                if not any(p in NAME_EXCEPTIONS for p in parts):
-                    return True
-            return False
-
-        def clean_tokens(seq):
-            cleaned = []
-            for t in seq:
-                t = re.sub(r",\s*", " ", t).strip().lower()
-                while True:
-                    parts = t.split()
-                    if parts and parts[-1] in STOP_WORDS:
-                        parts = parts[:-1]
-                        t = " ".join(parts)
-                    else:
-                        break
-                if not re.fullmatch(r"[a-z ]{2,48}", t):
-                    continue
-                if looks_like_name(t):
-                    continue
-                cleaned.append(t)
-            return cleaned
-
-        tags = clean_tokens(dict.fromkeys(existing))
-        if len(tags) >= 50:
-            return tags[:70]
-
-        caption_text = caption_text.lower()
-        caption_phrases = re.findall(r"[a-z]+(?: [a-z]+){0,3}", caption_text)
-        for phrase in clean_tokens(caption_phrases):
-            if phrase not in tags:
-                tags.append(phrase)
-            if len(tags) >= 50:
-                break
-        if len(tags) < 50:
-            for chunk in re.split(r"[,\n]", ci_text_raw.lower()):
-                for phrase in clean_tokens([chunk]):
-                    if phrase not in tags:
-                        tags.append(phrase)
-                    if len(tags) >= 50:
-                        break
-                if len(tags) >= 50:
-                    break
-        if len(tags) < 50:
-            fallback = [
-                "portrait",
-                "upper body",
-                "looking at camera",
-                "soft lighting",
-                "warm tones",
-                "sharp focus",
-                "depth of field",
-                "wooden interior",
-                "window light",
-                "cozy atmosphere",
-                "warm highlights",
-                "gentle shadow",
-            ]
-            for w in fallback:
-                if w not in tags:
-                    tags.append(w)
-                if len(tags) >= 50:
-                    break
-        return tags[:70]
-
-    ordered = ensure_minimum_tags(ordered, caption, ci_text)
-    prompt = ", ".join(ordered)
+    ordered = normalize.strip_name_tokens(ordered)
+    prompt_tags = bucketize.ensure_50_70(ordered, caption, list(ci_tags.keys()))
+    prompt = ", ".join(prompt_tags)
 
     style_name, params = style.determine_style(ci_text)
 
