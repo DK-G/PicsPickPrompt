@@ -18,7 +18,6 @@ TAGS_FILE = "selected_tags.csv"
 
 _session = None
 _tags = None
-_input_name = "input"
 
 
 def _ensure_files(model_dir: Path):
@@ -40,7 +39,7 @@ def _ensure_files(model_dir: Path):
 
 def _load() -> None:
     """Lazily load ONNX session and tag list."""
-    global _session, _tags, _input_name
+    global _session, _tags
     if _session is not None and _tags is not None:
         return
     try:
@@ -59,10 +58,9 @@ def _load() -> None:
         if not model_path.exists() or not tags_path.exists():
             raise FileNotFoundError("WD14 model files missing")
         _session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
-        _input_name = _session.get_inputs()[0].name
         with tags_path.open("r", encoding="utf-8") as f:
             reader = csv.reader(f)
-            _tags = [row[0] for row in reader if row and not row[0].startswith("rating:")]
+            _tags = [row[0] for row in reader if row]
     except Exception as exc:  # pragma: no cover - fallback path
         logger.warning("WD14 load failed: %s", exc, exc_info=True)
         _session, _tags = None, None
@@ -75,15 +73,15 @@ def extract_tags(path: Path, threshold: float = 0.35) -> Dict[str, float]:
         if _session is None or _tags is None:
             raise RuntimeError("WD14 unavailable")
 
-        img = Image.open(path).convert("RGB")
-        img = img.resize((448, 448), Image.BICUBIC)
-        x = np.asarray(img, dtype=np.float32) / 255.0
-        x = x.transpose(2, 0, 1)[None, ...]
-        y = _session.run(None, {_input_name: x})[0][0]
+        img = Image.open(path).convert("RGB").resize((448, 448), Image.BICUBIC)
+        x = np.asarray(img, dtype=np.float32) / 255.0  # (448,448,3)
+        x = x[np.newaxis, ...]  # (1,448,448,3)
+        input_name = _session.get_inputs()[0].name
+        y = _session.run(None, {input_name: x})[0][0]  # (num_tags,)
         out: Dict[str, float] = {}
-        for tag, score in zip(_tags, y):
+        for tag, score in zip(_tags, y.tolist()):
             s = float(score)
-            if s >= threshold:
+            if s >= threshold and not tag.startswith("rating:"):
                 out[tag.replace("_", " ")] = s
         return out
     except Exception as exc:  # pragma: no cover - inference failures

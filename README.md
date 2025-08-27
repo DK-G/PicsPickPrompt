@@ -5,9 +5,9 @@
 このプロトタイプは以下の抽出モデルを用いて推論を実行します。
 
 * **Florence-2** : キャプション生成
-* **WD14** : アニメ向けタグ抽出。特に Windows 環境ではこのモデルの利用を推奨します。
+* **WD14** : アニメ向けタグ抽出。特に Windows 環境ではこのモデルを優先して利用してください。
 * **CLIP Interrogator** : スタイルとライティングのヒント
-* **DeepDanbooru** (バックアップ) : 追加タグ抽出。`tensorflow-io` などの依存が必要なため Windows では非推奨。利用する場合は `tensorflow-cpu==2.12.*` と `tensorflow-io-gcs-filesystem==0.31.0` を手動でインストールしてください。
+* **DeepDanbooru** (バックアップ) : 追加タグ抽出。`tensorflow-io` などの依存が必要なため Windows では非推奨です。本リポジトリでは `tensorflow-io` を自動でインストールしないため、利用する場合は `tensorflow-cpu==2.12.*` と `tensorflow-io-gcs-filesystem==0.31.0` を手動でインストールしてください。
 
 ## セットアップ
 
