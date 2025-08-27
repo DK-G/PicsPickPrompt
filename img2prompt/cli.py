@@ -4,7 +4,12 @@ import logging
 
 from .extract import blip, clip_interrogator, deepdanbooru, wd14_onnx
 from .assemble import normalize, bucketize, palette, style
-from .utils.text_filters import clean_tokens, dedupe_background
+from .utils.text_filters import (
+    clean_tokens,
+    dedupe_background,
+    is_bad_token,
+    normalize_terms,
+)
 from .options.style_presets import apply_style, STYLE_PRESETS
 from .export import writer
 
@@ -70,9 +75,15 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
     prompt_tags = clean_tokens(merged_before)
     after_clean = len(prompt_tags)
     prompt_tags = bucketize.ensure_50_70(
-        prompt_tags, caption, ci_picks, min_total=55, max_total=70
+        prompt_tags,
+        caption,
+        ci_picks,
+        min_total=55,
+        max_total=70,
+        allow=lambda w: not is_bad_token(w),
     )
     prompt_tags = dedupe_background(prompt_tags)
+    prompt_tags = normalize_terms(prompt_tags)
     final_count = len(prompt_tags)
     if style_preset:
         prompt_tags = apply_style(prompt_tags, style_preset)

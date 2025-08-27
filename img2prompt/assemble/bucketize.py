@@ -124,23 +124,45 @@ FILLER_BANK = [
   "muted colors","shallow depth","soft focus"
 ]
 
-def ensure_50_70(tags: List[str], caption: str, ci_picks: List[str], min_total: int = 50, max_total: int = 70) -> List[str]:
-    nounish = [p.strip() for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
-               if 1 <= len(p.split()) <= 4]
+def ensure_50_70(
+    tags: List[str],
+    caption: str,
+    ci_picks: List[str],
+    min_total: int = 55,
+    max_total: int = 70,
+    allow=None,
+) -> List[str]:
+    allow = allow or (lambda w: True)
+    nounish = [
+        p.strip()
+        for p in re.findall(r"[a-z][a-z ]{2,40}", (caption or "").lower())
+        if 1 <= len(p.split()) <= 4
+    ]
 
     merged: List[str] = []
+    seen: set[str] = set()
 
-    def add_many(src: List[str], limit: int | None = None) -> None:
-        for w in src:
+    def add_many(src: List[str] | None, limit: int | None = None) -> None:
+        nonlocal merged
+        for w in src or []:
             w = (w or "").strip(" ,").lower()
-            if 2 <= len(w) <= 40 and w not in merged:
+            if not w or w in seen:
+                continue
+            if not allow(w):
+                continue
+            if 2 <= len(w) <= 40:
                 merged.append(w)
+                seen.add(w)
                 if limit and len(merged) >= limit:
                     break
 
     add_many(tags)
-    if len(merged) < min_total: add_many(nounish, limit=min_total)
-    if len(merged) < min_total: add_many(ci_picks or [], limit=min_total)
-    if len(merged) < min_total: add_many(FLOOR, limit=min_total)
-    if len(merged) < min_total: add_many(FILLER_BANK, limit=min_total)
+    if len(merged) < min_total:
+        add_many(nounish, limit=min_total)
+    if len(merged) < min_total:
+        add_many(ci_picks, limit=min_total)
+    if len(merged) < min_total:
+        add_many(FLOOR, limit=min_total)
+    if len(merged) < min_total:
+        add_many(FILLER_BANK, limit=min_total)
     return merged[:max_total]
