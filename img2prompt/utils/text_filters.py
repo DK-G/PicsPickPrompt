@@ -8,7 +8,10 @@ NUMERIC_PAT = re.compile(r"^\d+$")
 ARTIST_TOKENS = {
     "Ayami Kojima","Rei Hiroe","Shiori Teshirogi","Tsugumi Ohba",
     "Tsukasa Dokite","Omina Tachibana","Kohei Murata",
-    "Makoto Shinkai","Erika Ikuta","Harumi"
+    "Makoto Shinkai","Erika Ikuta","Harumi",
+    # 単語（小文字化比較で弾く）
+    "Ayami","Kojima","Ohba","Teshirogi","Hiroe",
+    "Dokite","Tachibana","Ikuta","Shinkai",
 }
 # 小文字・空白除去済みの比較セット
 _ART_LOWER_NOWS = {
@@ -119,5 +122,17 @@ def clean_tokens(tokens):
         if t not in seen:
             seen.add(t); out.append(t)
 
+    return out
+
+
+def dedupe_background(tags):
+    out = []
+    seen_bg = False
+    for t in tags:
+        if "background" in t:
+            if seen_bg:
+                continue
+            seen_bg = True
+        out.append(t)
     return out
 
