@@ -266,6 +266,9 @@ def drop_contradictions(tags: list[str]) -> list[str]:
             s.discard("loose framing")
         else:
             s.discard("tight framing")
+    # 上半身キューがあるなら loose framing は落とす
+    if "loose framing" in s and (s & UPPER_BODY_CUES):
+        s.discard("loose framing")
 
     # 構図
     if "rule of thirds" in s and "centered composition" in s:
@@ -352,6 +355,40 @@ def _would_be_group_dup(term: str, current: list[str]) -> bool:
         return False
     cur = {t.lower() for t in current}
     return any(x in cur for x in _ALL_GROUPS[gid])
+
+
+def _would_conflict(term: str, current: list[str]) -> bool:
+    """候補 term を入れると矛盾や衝突が起きるなら True"""
+    t = term.strip().lower()
+    cur = {c.strip().lower() for c in current}
+
+    # 構図
+    if t == "centered composition" and "balanced composition" in cur:
+        return True
+    if t == "balanced composition" and "centered composition" in cur:
+        return True
+
+    # フレーミング（上半身キューがあるなら loose は避ける）
+    if (t == "loose framing") and (cur & UPPER_BODY_CUES):
+        return True
+    if (t == "tight framing") and ("loose framing" in cur):
+        return True
+
+    # フォーカス／絞り
+    if t == "soft focus" and "sharp focus" in cur:
+        return True
+    if t == "sharp focus" and "soft focus" in cur:
+        return True
+    if t == "narrow aperture" and "shallow depth" in cur:
+        return True
+    if t == "wide aperture" and "shallow depth" not in cur and "depth of field" in cur:
+        return False
+
+    # 目の状態
+    if t == "closed eyes" and ({"looking at camera", "eye contact", "open eyes"} & cur):
+        return True
+
+    return False
 
 
 def compress_redundant(tokens: list[str]) -> list[str]:
@@ -548,14 +585,20 @@ def finalize_prompt_safe(
                 break
             if w in seen:
                 continue
-            if bg_present and ("background" in w or "backdrop" in w):
-                continue
+            if "background" in w or "backdrop" in w:
+                if bg_present:
+                    continue
+                w = "clean background"
             if any(c in seen for c in CONTRA_FILL.get(w, set())):
                 continue
             if _would_be_group_dup(w, out):
                 continue
+            if _would_conflict(w, out):
+                continue
             out.append(w)
             seen.add(w)
+            if "background" in w or "backdrop" in w:
+                bg_present = True
 
     # 3) 念のためもう一度だけ圧縮
     out = compress_redundant(out)
@@ -572,9 +615,10 @@ def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, 
     tokens = unify_background(tokens)
     tokens = drop_invisible_clothes(tokens)
     tokens = drop_contradictions(tokens)
-    tokens = adjust_framing_for_cues(tokens)
     tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
+
     tokens = finalize_prompt_safe(tokens, min_tokens=55, max_tokens=65, context=context)
+    tokens = drop_contradictions(tokens)
     tokens = compress_redundant(tokens)
     tokens = dedupe_background(tokens)
     tokens = unify_background(tokens)
