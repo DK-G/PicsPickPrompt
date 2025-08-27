@@ -57,6 +57,7 @@ def test_clean_tokens_filters_typos_in_artist_names():
     tokens = [
         "ayami koj ima",
         "matoko shinkai",
+        "deayami kojima",
         "soft lighting",
     ]
     out = clean_tokens(tokens)
