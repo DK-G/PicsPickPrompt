@@ -1,43 +1,33 @@
 import re
 import unicodedata
 
-# TitleCase の姓名だけを人名とみなす（写真語 "upper body" 等を誤排除しない）
+# TitleCase 姓名検出
 NAME_TITLECASE = re.compile(r"\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b")
-
 NUMERIC_PAT = re.compile(r"^\d+$")
 
-# 既知のアーティスト名（最小限）
+# 既知のアーティスト・人名（大文字小文字を問わず判定する）
 ARTIST_TOKENS = {
     "Ayami Kojima","Rei Hiroe","Shiori Teshirogi","Tsugumi Ohba",
     "Tsukasa Dokite","Omina Tachibana","Kohei Murata",
-    "Ayami","Kojima","Ohba","Murata","Teshirogi","Hiroe",
+    "Makoto Shinkai","Erika Ikuta","Harumi"
 }
+ARTIST_TOKENS_LOWER = {a.lower() for a in ARTIST_TOKENS}
 
-# 線画/アニメ系の“除外候補”（サブストリングOK）
+# 線画/アニメ系ノイズ
 BAN_SUBSTR = {
-    "comic","manga","cartoon","lineart","sketch",
-    "monochrome","grayscale","greyscale","sensitive"
+    "1girl","1boy","solo","comic","manga","cartoon",
+    "lineart","sketch","monochrome","grayscale","greyscale","sensitive"
 }
 
-# メタ情報や曖昧表現など、完全一致で弾く語
+# メタ・文章系ノイズ
 META_EXACT = {
-    "artist name",
-    "twitter username",
-    "page number",
-    "text focus",
-    "negative space",
-    "no humans",
-    "multiple girls",
-    "general",
-    "dated",
+    "artist name","twitter username","page number","general","dated",
 }
-
-# 宣伝や曖昧語など、部分一致で弾くフレーズ（英語のみ想定）
 BAN_PHRASES_SUBSTR = {
     "beautiful japanese girls face",
 }
 
-# 写真系の“二語フレーズ”は明示ホワイトリストで必ず通す
+# 写真系ホワイトリスト（二語フレーズ）
 SAFE_TWO_WORDS = {
     "upper body","soft lighting","warm tones","sharp focus","depth of field",
     "wooden interior","window light","cozy atmosphere","warm highlights",
@@ -52,46 +42,60 @@ def _nfkc_lower(s: str) -> str:
     return unicodedata.normalize("NFKC", s).strip(" ,.;:").lower()
 
 def _is_artist_like(raw: str) -> bool:
-    # 空白を詰めた比較で OCR 崩れにも耐性
     raw_nfkc = unicodedata.normalize("NFKC", raw).strip()
-    nospace = raw_nfkc.replace(" ", "")
-    for a in ARTIST_TOKENS:
-        if raw_nfkc == a or nospace == a.replace(" ", ""):
-            return True
-    # TitleCase 姓名のみ人名判定（lower化後の二語は弾かない）
-    return NAME_TITLECASE.search(raw) is not None
+    raw_lower = raw_nfkc.lower()
+    nospace = raw_lower.replace(" ", "")
+
+    if raw_lower in ARTIST_TOKENS_LOWER:
+        return True
+    if nospace in {a.replace(" ", "").lower() for a in ARTIST_TOKENS}:
+        return True
+    if NAME_TITLECASE.search(raw_nfkc):  # TitleCase 姓名
+        return True
+    return False
 
 def clean_tokens(tokens):
     out, seen = [], set()
+    background_seen = False
+
     for raw in tokens:
         if not raw:
             continue
-        # ホワイトリスト先行：写真系二語は無条件で通す
-        if _nfkc_lower(raw) in SAFE_TWO_WORDS:
-            t = _nfkc_lower(raw)
-            if t not in seen:
-                seen.add(t); out.append(t)
-            continue
 
-        # 通常チェック
-        if _is_artist_like(raw):              # 人名/作家名（TitleCase）除外
-            continue
-        t = _nfkc_lower(raw)
-        if not (2 <= len(t) <= 40):           # 極端に短長は除外
-            continue
-        if NUMERIC_PAT.match(t):              # 純数値は除外
-            continue
-        if any(b in t for b in BAN_SUBSTR):   # 線画/アニメ系ノイズ
-            continue
+        t_raw = raw.strip()
+        t = _nfkc_lower(t_raw)
+        safe = t in SAFE_TWO_WORDS
 
-        # 追加ノイズ除去
-        if t in META_EXACT:                   # メタ情報など
-            continue
-        if any(p in t for p in BAN_PHRASES_SUBSTR):  # 宣伝/曖昧語
-            continue
-        if t in {"standing", "1girl", "1boy", "solo"}:  # カウント系
-            continue
+        if not safe:
+            # ❌ 人名/作家名除去
+            if _is_artist_like(t_raw):
+                continue
 
+            # ❌ 数値/短すぎ長すぎ
+            if not (2 <= len(t) <= 40):
+                continue
+            if NUMERIC_PAT.match(t):
+                continue
+
+            # ❌ 線画/アニメ系ノイズ
+            if any(b in t for b in BAN_SUBSTR):
+                continue
+
+            # ❌ メタ・文章系ノイズ
+            if t in META_EXACT:
+                continue
+            if any(p in t for p in BAN_PHRASES_SUBSTR):
+                continue
+
+        # ❌ 背景タグは1つだけ残す
+        if "background" in t:
+            if background_seen:
+                continue
+            background_seen = True
+
+        # ✅ 重複排除
         if t not in seen:
             seen.add(t); out.append(t)
+
     return out
+
