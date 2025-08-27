@@ -6,7 +6,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 
-from img2prompt.utils.text_filters import clean_tokens, dedupe_background
+from img2prompt.utils.text_filters import clean_tokens, dedupe_background, is_bad_token
 
 
 def test_clean_tokens_filters_noise_and_meta():
@@ -87,4 +87,11 @@ def test_dedupe_background_removes_extra_backgrounds():
     tags = ["white background", "clean background", "soft lighting"]
     out = dedupe_background(tags)
     assert out == ["white background", "soft lighting"]
+
+
+def test_is_bad_token_handles_whitelist_and_bans():
+    assert is_bad_token("1girl")
+    assert is_bad_token("Makoto Shinkai")
+    assert is_bad_token("123")
+    assert not is_bad_token("soft lighting")
 

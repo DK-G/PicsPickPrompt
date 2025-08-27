@@ -6,7 +6,6 @@ from .extract import blip, clip_interrogator, deepdanbooru, wd14_onnx
 from .assemble import normalize, bucketize, palette, style
 from .utils.text_filters import (
     clean_tokens,
-    dedupe_background,
     is_bad_token,
     normalize_terms,
 )
@@ -82,7 +81,6 @@ def run(image_path: str, style_preset: str | None = None) -> Path:
         max_total=70,
         allow=lambda w: not is_bad_token(w),
     )
-    prompt_tags = dedupe_background(prompt_tags)
     prompt_tags = normalize_terms(prompt_tags)
     final_count = len(prompt_tags)
     if style_preset:
