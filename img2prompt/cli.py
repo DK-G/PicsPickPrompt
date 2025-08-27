@@ -39,12 +39,12 @@ def run(image_path: str) -> Path:
         tags_debug["deepdanbooru"] = {"count": 0, "ok": False, "error": str(exc)}
 
     try:
-        ci_tags_raw, ci_picks, ci_raw = clip_interrogator.extract_tags(image_path)
-        ci_tags = normalize.remove_placeholders(ci_tags_raw)
+        ci_tags, ci_picks, ci_raw = clip_interrogator.extract_tags(image_path)
+        ci_tags = normalize.remove_placeholders(ci_tags)
         tags_debug["clip_interrogator"] = {"count": len(ci_tags), "ok": True}
     except Exception as exc:  # pragma: no cover - should be rare
         logger.warning("CLIP Interrogator extractor failed: %s", exc, exc_info=True)
-        ci_tags, ci_picks, ci_text = {}, [], ""
+        ci_tags, ci_picks, ci_raw = {}, [], ""
         tags_debug["clip_interrogator"] = {
             "count": 0,
             "ok": False,
@@ -69,7 +69,7 @@ def run(image_path: str) -> Path:
     prompt_tags = clean_tokens(prompt_tags)
     prompt = ", ".join(prompt_tags)
 
-    style_name, params = style.determine_style(ci_raw)
+    style_name, params = style.determine_style(ci_raw, wd_tags)
 
     print(
         f"[DEBUG] wd14={len(wd_tags)}, dd={len(dd_tags)}, ci={len(ci_tags)}, "
