@@ -1,5 +1,8 @@
 import re, unicodedata
 import difflib
+import random
+import hashlib
+from typing import Sequence
 
 NUMERIC_PAT = re.compile(r"^\d+$")
 
@@ -284,6 +287,42 @@ def drop_contradictions(tags: list[str]) -> list[str]:
     return [t for t in tags if t.strip().lower() in s]
 
 
+REDUNDANT_GROUPS = [
+    {"warm tones", "warm color palette", "muted colors", "neutral palette"},
+    {"soft contrast", "low contrast look"},
+    {"depth of field", "shallow depth"},
+    {"subtle bokeh", "creamy bokeh"},
+    {"balanced composition", "negative space balance"},
+    {"fine details", "surface detail", "refined detail"},
+    {"realistic texture", "natural rendition", "clean rendition"},
+]
+
+PREFER_ORDER = {
+    "warm tones": 0,
+    "soft contrast": 0,
+    "shallow depth": 0,
+    "subtle bokeh": 0,
+    "balanced composition": 0,
+    "fine details": 0,
+    "realistic texture": 0,
+}
+
+
+def compress_redundant(tokens: list[str]) -> list[str]:
+    s = [t.strip() for t in tokens]
+    keep = set(t.lower() for t in s)
+
+    for group in REDUNDANT_GROUPS:
+        inter = keep & {g.lower() for g in group}
+        if len(inter) >= 2:
+            ranked = sorted(inter, key=lambda x: PREFER_ORDER.get(x, 999))
+            winner = ranked[0]
+            keep -= inter
+            keep.add(winner)
+
+    return [t for t in s if t.lower() in keep]
+
+
 CAPTION_OBJECTS = [
     "laptop",
     "phone",
@@ -431,39 +470,49 @@ MIN_TOKENS = 55
 MAX_TOKENS = 65
 
 
+def _seed_from_context(context: Sequence[str] | None = None) -> int:
+    if not context:
+        return random.randrange(1 << 30)
+    h = hashlib.sha1(("||".join(context)).encode("utf-8")).hexdigest()
+    return int(h[:8], 16)
+
+
 def finalize_prompt_safe(
-    prompt_tags: list[str],
-    min_total: int = MIN_TOKENS,
-    max_total: int = MAX_TOKENS,
+    tokens: list[str],
+    min_tokens: int = MIN_TOKENS,
+    max_tokens: int = MAX_TOKENS,
+    context: Sequence[str] | None = None,
 ) -> list[str]:
-    """Fill up missing slots with safe vocabulary only."""
-    seen = set(prompt_tags)
-    bg_present = any("background" in t or "backdrop" in t for t in prompt_tags)
-    for w in SAFE_FILL:
-        if len(prompt_tags) >= min_total:
-            break
-        if w in seen:
-            continue
-        if bg_present and ("background" in w or "backdrop" in w):
-            continue
-        if any(c in seen for c in CONTRA_FILL.get(w, set())):
-            continue
-        prompt_tags.append(w)
-        seen.add(w)
-    return prompt_tags[:max_total]
+    out = tokens[:]
+    if len(out) < min_tokens:
+        rnd = random.Random(_seed_from_context(context or out))
+        pool = SAFE_FILL[:]
+        rnd.shuffle(pool)
+        seen = set(out)
+        bg_present = any("background" in t or "backdrop" in t for t in out)
+        for w in pool:
+            if len(out) >= min_tokens:
+                break
+            if w in seen:
+                continue
+            if bg_present and ("background" in w or "backdrop" in w):
+                continue
+            if any(c in seen for c in CONTRA_FILL.get(w, set())):
+                continue
+            out.append(w)
+            seen.add(w)
+    return out[:max_tokens]
 
 
-def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None) -> list[str]:
+def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None, context=None) -> list[str]:
     tokens = normalize_terms(tokens)
     tokens = dedupe_background(tokens)
     tokens = unify_background(tokens)
     tokens = drop_invisible_clothes(tokens)
     tokens = drop_contradictions(tokens)
-
-    # ← ここで「人名断片」を掃除
     tokens = purge_artist_fragments(tokens, blocked_fullnames=blocked_names)
-
-    tokens = finalize_prompt_safe(tokens, min_total=MIN_TOKENS, max_total=MAX_TOKENS)
+    tokens = compress_redundant(tokens)
+    tokens = finalize_prompt_safe(tokens, min_tokens=MIN_TOKENS, max_tokens=MAX_TOKENS, context=context)
     tokens = dedupe_background(tokens)
     tokens = unify_background(tokens)
     return tokens
