@@ -71,7 +71,17 @@ BAN_SUBSTR = {
     "comic","manga","cartoon","lineart","sketch","monochrome","grayscale","greyscale","sensitive",
 }
 BAN_EXACT = {"standing","solo","1girl","1boy"}
-META_EXACT = {"artist name","twitter username","page number","general","dated","negative space"}
+META_EXACT = {
+    "artist name",
+    "twitter username",
+    "page number",
+    "general",
+    "dated",
+    "negative space",
+    "text focus",
+    "no humans",
+    "multiple girls",
+}
 BAN_PHRASES_SUBSTR = {"beautiful japanese girls face"}
 
 def _nfkc_lower(s: str) -> str:
@@ -82,45 +92,23 @@ def clean_tokens(tokens):
     bg_kept = False
 
     for raw in tokens:
-        if not raw: 
+        if not raw:
             continue
         t_raw = raw.strip()
         t = _nfkc_lower(t_raw)
 
-        # ✅ 先にホワイトリスト（写真語）は無条件通過（人名判定より先！）
-        if (t in SAFE_EXACT) or any(key in t for key in SAFE_SUBSTR):
-            if t not in seen:
-                seen.add(t); out.append(t)
+        if is_bad_token(t_raw):
             continue
 
-        # ❌ 人名（軽微typo含む）
-        if _looks_like_artist(t_raw):
-            continue
-
-        # ❌ 数値/長さ
-        if not (2 <= len(t) <= 40): 
-            continue
-        if NUMERIC_PAT.match(t):
-            continue
-
-        # ❌ アニメ/線画系
-        if any(b in t for b in BAN_SUBSTR):
-            continue
-
-        # ❌ メタ・文章・カウント
-        if t in META_EXACT or t in BAN_EXACT:
-            continue
-        if any(p in t for p in BAN_PHRASES_SUBSTR):
-            continue
-
-        # ❌ 背景は1つだけ
+        # 背景は1つだけ
         if "background" in t:
             if bg_kept:
                 continue
             bg_kept = True
 
         if t not in seen:
-            seen.add(t); out.append(t)
+            seen.add(t)
+            out.append(t)
     return out
 
 # --- 4) ensure_50_70の後に背景重複を最終整理（補完で再注入された分を落とす） ---
@@ -138,6 +126,10 @@ def dedupe_background(tags):
 def is_bad_token(raw: str) -> bool:
     """補完時にも再利用できる禁止語判定。まず“安全語は常に許可”。"""
     t = _nfkc_lower(raw or "")
+    # ただしメタ語は必ず弾く
+    if t in META_EXACT:
+        return True
+
     # ✅ 先にホワイトリスト優先
     if (t in SAFE_EXACT) or any(k in t for k in SAFE_SUBSTR):
         return False
@@ -149,7 +141,7 @@ def is_bad_token(raw: str) -> bool:
         return True
     if _looks_like_artist(raw):
         return True
-    if t in META_EXACT or t in BAN_EXACT:
+    if t in BAN_EXACT:
         return True
     if any(p in t for p in BAN_PHRASES_SUBSTR):
         return True
@@ -175,4 +167,52 @@ def normalize_terms(tags: list[str]) -> list[str]:
             seen.add(t2)
             out.append(t2)
     return out
+
+
+SAFE_FILL = [
+    "portrait",
+    "upper body",
+    "looking at camera",
+    "soft lighting",
+    "warm tones",
+    "sharp focus",
+    "depth of field",
+    "window light",
+    "cozy atmosphere",
+    "warm highlights",
+    "gentle shadow",
+    "natural skin tones",
+    "ambient light",
+    "balanced composition",
+    "eye level view",
+    "soft contrast",
+    "realistic texture",
+    "warm color palette",
+    "fine details",
+    "cinematic feel",
+    "subtle bokeh",
+    "subtle shadows",
+    "smooth gradients",
+    "natural highlights",
+    "muted colors",
+    "shallow depth",
+    "soft focus",
+    "clean background",
+]
+
+
+def finalize_prompt_safe(
+    prompt_tags: list[str],
+    min_total: int = 55,
+    max_total: int = 70,
+) -> list[str]:
+    """Fill up missing slots with safe vocabulary only."""
+    seen = set(prompt_tags)
+    for w in SAFE_FILL:
+        if len(prompt_tags) >= min_total:
+            break
+        if w not in seen:
+            prompt_tags.append(w)
+            seen.add(w)
+    return prompt_tags[:max_total]
 

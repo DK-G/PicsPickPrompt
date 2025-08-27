@@ -144,6 +144,7 @@ def ensure_50_70(
     merged: List[str] = []
     seen: set[str] = set()
     bg_kept = False
+    blocked: list[str] = []
 
     def add_many(src: List[str] | None, limit: int | None = None) -> None:
         nonlocal bg_kept
@@ -156,10 +157,12 @@ def ensure_50_70(
                 if bg_kept:
                     continue
                 if not allow(w):
+                    blocked.append(w)
                     continue
                 bg_kept = True
             else:
                 if not allow(w):
+                    blocked.append(w)
                     continue
             merged.append(w)
             seen.add(w)
@@ -175,4 +178,5 @@ def ensure_50_70(
         add_many(FLOOR, min_total)
     if len(merged) < min_total:
         add_many(FILLER_BANK, min_total)
+    print(f"[DEBUG] blocked_in_ensure={blocked[:10]} (+{max(0, len(blocked) - 10)} more)")
     return merged[:max_total]
