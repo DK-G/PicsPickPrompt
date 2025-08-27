@@ -186,23 +186,57 @@ def dedupe_background(tags):
         out.append(t)
     return out
 
+# 画角ベースで下半身系タグを除去
+UPPER_BODY_CUES = {
+    "upper body",
+    "bust shot",
+    "head-and-shoulders framing",
+    "portrait",
+    "three-quarter view",
+}
+LOWER_GARMENTS = {
+    "skirt",
+    "shorts",
+    "pants",
+    "jeans",
+    "trousers",
+    "stockings",
+    "socks",
+    "tights",
+    "shoes",
+    "boots",
+    "heels",
+    "loafers",
+}
+
+
+def drop_invisible_clothes(tokens: list[str]) -> list[str]:
+    s = {t.lower().strip() for t in tokens}
+    # 上半身キューが1つでもあれば下半身タグを落とす
+    if s & UPPER_BODY_CUES:
+        return [t for t in tokens if t.lower().strip() not in LOWER_GARMENTS]
+    return tokens
+
 
 def drop_contradictions(tags: list[str]) -> list[str]:
     """明らかな矛盾（長短や有無の衝突）を簡易に解消する。"""
     s = set(t.strip() for t in tags)
 
-    # 髪の長さ
-    hair = {"long hair","short hair","very short hair","medium hair"}
-    both_hair = s & hair
-    if len(both_hair) >= 2:
-        s -= hair  # ニュートラルへ
+    # 髪の長さ（既存）
+    hair = {"long hair", "short hair", "very short hair", "medium hair"}
+    if len(s & hair) >= 2:
+        s -= hair
 
-    # 追加したい矛盾ルールがあればここに追記
-    # 例: "open mouth" と "closed mouth" 等
-    mouth = {"open mouth","closed mouth"}
-    both_mouth = s & mouth
-    if len(both_mouth) >= 2:
-        s -= mouth
+    # 目の状態：looking at camera / eye contact / open eyes があれば closed eyes を落とす
+    eye_pos = {"looking at camera", "eye contact", "open eyes"}
+    if (s & eye_pos) and "closed eyes" in s:
+        s.remove("closed eyes")
+
+    # 口の状態：smile と closed mouth が同居したら closed mouth を落とす
+    if "smile" in s and "closed mouth" in s:
+        s.remove("closed mouth")
+
+    # 互いに排他指定したいものをここに追加可能
 
     return [t for t in tags if t in s]
 
@@ -331,6 +365,7 @@ def finalize_prompt_safe(
 def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None) -> list[str]:
     tokens = normalize_terms(tokens)
     tokens = dedupe_background(tokens)
+    tokens = drop_invisible_clothes(tokens)
     tokens = drop_contradictions(tokens)
 
     # ← ここで「人名断片」を掃除
@@ -338,8 +373,5 @@ def finalize_pipeline(tokens: list[str], blocked_names: set[str] | None = None) 
 
     tokens = finalize_prompt_safe(tokens, min_total=MIN_TOKENS, max_total=MAX_TOKENS)
     tokens = dedupe_background(tokens)  # 埋め戻しで背景語が再増殖した場合の最終整理
-    if len(tokens) < MIN_TOKENS:
-        tokens = finalize_prompt_safe(tokens, min_total=MIN_TOKENS, max_total=MAX_TOKENS)
-        tokens = dedupe_background(tokens)
     return tokens
 
